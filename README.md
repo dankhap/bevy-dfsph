@@ -1,2 +1,2 @@
 # bevy-dfsph
-testing rust sph implementation
+testing rust sph implementation with bevy framework
