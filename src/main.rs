@@ -12,6 +12,39 @@ use rand::{prelude::SliceRandom, Rng};
 use std::{
     collections::BTreeSet,
 };
+use bevy::render::camera::{Camera, CameraProjection, DepthCalculation, VisibleEntities};
+
+struct SimpleOrthoProjection {
+    far: f32,
+    aspect: f32,
+}
+
+impl CameraProjection for SimpleOrthoProjection {
+    fn get_projection_matrix(&self) -> Mat4 {
+        Mat4::orthographic_rh(
+            -self.aspect, self.aspect, 0.1, 3.0, 0.0, self.far
+        )
+    }
+
+    // what to do on window resize
+    fn update(&mut self, width: f32, height: f32) {
+        self.aspect = width / height;
+    }
+
+    fn depth_calculation(&self) -> DepthCalculation {
+        // for 2D (camera doesn't rotate)
+        DepthCalculation::ZDifference
+
+        // otherwise
+        // DepthCalculation::Distance
+    }
+}
+
+impl Default for SimpleOrthoProjection {
+    fn default() -> Self {
+        Self { far: 1000.0, aspect: 1.0 }
+    }
+}
 
 pub struct HelloPlugin;
 struct Particle;
@@ -25,7 +58,6 @@ struct ParticlePool {
 struct Position(Vec3);
 struct Name(String);
 struct GreetTimer(Timer);
-struct Contributor {hue: f32}
 type Particles = BTreeSet<String>;
 struct SelectTimer;
 struct ContributorDisplay;
@@ -82,38 +114,57 @@ fn setup(
     mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
 
-    commands.spawn_bundle(OrthographicCameraBundle::new_2d());
-    commands.spawn_bundle(UiCameraBundle::default());
-    
-    let mut sel = ContributorSelection {
-        order: vec![],
-        idx: 0,
-    };
+    /* commands.spawn_bundle(OrthographicCameraBundle::new_2d());
+    commands.spawn_bundle(UiCameraBundle::default()); */
+     // but with our custom projection
+
+    let projection = SimpleOrthoProjection::default();
+
+    // Need to set the camera name to one of the bevy-internal magic constants,
+    // depending on which camera we are implementing (2D, 3D, or UI).
+    // Bevy uses this name to find the camera and configure the rendering.
+    // Since this example is a 2d camera:
+
+    let cam_name = bevy::render::render_graph::base::camera::CAMERA_2D;
+
+    let mut camera = Camera::default();
+    camera.name = Some(cam_name.to_string());
+    commands.spawn_bundle((
+        // position the camera like bevy would do by default for 2D:
+        Transform::from_translation(Vec3::new(0.0, 0.0, projection.far - 0.1)),
+        GlobalTransform::default(),
+        VisibleEntities::default(),
+        camera,
+        projection,
+    ));
+
+
     let mut fluid_world = sph::FluidParticleWorld::new(
         2.0,    // smoothing factor
-        5000.0, // #particles/m²
+        1000.0, // #1660, 5000 particles/m²
         100.0,  // density of water (? this is 2d, not 3d where it's 1000 kg/m³)
     );
     reset_fluid(&mut fluid_world);
-    let mut rnd = rand::thread_rng();
-    for pos in fluid_world.particles.positions {
-
-        let hue = rnd.gen_range(0.0..=360.0);
-        let dir = rnd.gen_range(-1.0..1.0);
-        let velocity = Vec3::new(dir * 500.0, 0.0, 0.0);
-        let transform = Transform::from_xyz(pos.x, pos.y, 0.0);
+    let particle_radius = fluid_world.properties.particle_radius()*200.0;
         let shape = shapes::RegularPolygon {
                 sides: 6,
-                feature: shapes::RegularPolygonFeature::Radius(SPRITE_SIZE),
+                feature: shapes::RegularPolygonFeature::Radius(particle_radius),
                 ..shapes::RegularPolygon::default()
             };
+
+    println!("nbumber of particales: {}",fluid_world.particles.positions.len());
+    println!("radius of particales: {}",particle_radius);
+
+    for (pos,vel) in fluid_world.particles.positions.iter().zip(fluid_world.particles.velocities.iter()) {
+        let velocity = Vec3::new(vel[0], vel[1], 0.0);
+
+        let transform = Transform::from_xyz(pos.x, pos.y, 0.0);
         let e = commands
             .spawn()
             .insert_bundle((
-                Contributor { hue },
                 Velocity {
                     translation: velocity,
-                    rotation: -dir * 5.0,
+                    rotation: 0.0
                 },
             ))
             .insert_bundle(GeometryBuilder::build_as(
@@ -128,12 +179,12 @@ fn setup(
             .id();
     }
 
-    for pos in fluid_world.particles.boundary_particles {
+    for pos in &fluid_world.particles.boundary_particles {
 
         let transform = Transform::from_xyz(pos.x, pos.y, 0.0);
         let shape = shapes::RegularPolygon {
                 sides: 6,
-                feature: shapes::RegularPolygonFeature::Radius(SPRITE_SIZE),
+                feature: shapes::RegularPolygonFeature::Radius(particle_radius),
                 ..shapes::RegularPolygon::default()
             };
         commands
@@ -149,47 +200,6 @@ fn setup(
             ))
             .id();
     }
-
-    /* for i in 1..500{
-        let pos = (rnd.gen_range(-400.0..400.0), rnd.gen_range(0.0..400.0));
-        let dir = rnd.gen_range(-1.0..1.0);
-        let velocity = Vec3::new(dir * 500.0, 0.0, 0.0);
-        let hue = rnd.gen_range(0.0..=360.0);
-
-        // some sprites should be flipped
-        let flipped = rnd.gen_bool(0.5);
-
-        let transform = Transform::from_xyz(pos.0, pos.1, 0.0);
-        let shape = shapes::RegularPolygon {
-                sides: 6,
-                feature: shapes::RegularPolygonFeature::Radius(SPRITE_SIZE),
-                ..shapes::RegularPolygon::default()
-            };
-        let e = commands
-            .spawn()
-            .insert_bundle((
-                Contributor { hue },
-                Velocity {
-                    translation: velocity,
-                    rotation: -dir * 5.0,
-                },
-            ))
-            .insert_bundle(GeometryBuilder::build_as(
-                &shape,
-                ShapeColors::outlined(Color::BLUE, Color::BLACK),
-                DrawMode::Outlined {
-                    fill_options: FillOptions::default(),
-                    outline_options: StrokeOptions::default().with_line_width(1.0),
-                },
-                transform,
-            ))
-            .id();
-
-        sel.order.push((i.to_string(), e));
-    }
- */
-    sel.order.shuffle(&mut rnd);
-    commands.insert_resource(sel);
     commands.insert_resource(fluid_world);
 }
 
@@ -218,7 +228,7 @@ fn velocity_system(time: Res<Time>, mut q: Query<&mut Velocity>) {
 /// force.
 fn collision_system(
     wins: Res<Windows>,
-    mut q: Query<(&mut Velocity, &mut Transform), With<Contributor>>,
+    mut q: Query<(&mut Velocity, &mut Transform), With<sph::FluidParticleWorld>>,
 ) {
     let mut rnd = rand::thread_rng();
 
@@ -260,8 +270,10 @@ fn collision_system(
 }
 
 /// Apply velocity to positions and rotations.
-fn move_system(time: Res<Time>, mut q: Query<(&Velocity, &mut Transform)>) {
+fn move_system(time: Res<Time>, particle_world: ResMut<sph::FluidParticleWorld>, mut q: Query<(&Velocity, &mut Transform)>) {
     let delta = time.delta_seconds();
+    // particle_world.timestep();
+    
 
     for (v, mut t) in q.iter_mut() {
         t.translation += delta * v.translation;

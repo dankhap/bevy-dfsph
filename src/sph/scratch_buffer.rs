@@ -1,18 +1,18 @@
 use crate::units::*;
 use cgmath::prelude::*;
 use std::cell::RefCell;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 pub struct ScratchBuffer<T: Copy, TStorage: Copy> {
     pub buffer: Vec<T>,
-    store: Arc<RefCell<ScratchBufferTypeStore<TStorage>>>,
+    store: Arc<Mutex<ScratchBufferTypeStore<TStorage>>>,
 }
 
 impl<'a, T: Copy, TStorage: Copy> Drop for ScratchBuffer<T, TStorage> {
     fn drop(&mut self) {
         let mut new_buffer_data_owner = Vec::new();
         std::mem::swap(&mut new_buffer_data_owner, &mut self.buffer);
-        self.store.borrow_mut().return_buffer(new_buffer_data_owner);
+        self.store.lock().unwrap().return_buffer(new_buffer_data_owner);
     }
 }
 
@@ -48,43 +48,43 @@ impl<TStorage: Copy> ScratchBufferTypeStore<TStorage> {
 }
 
 pub struct ScratchBufferStore {
-    buffers_real: Arc<RefCell<ScratchBufferTypeStore<Real>>>,
-    buffers_vector: Arc<RefCell<ScratchBufferTypeStore<Vector>>>,
+    buffers_real: Arc<Mutex<ScratchBufferTypeStore<Real>>>,
+    buffers_vector: Arc<Mutex<ScratchBufferTypeStore<Vector>>>,
 }
 
 #[allow(clippy::new_without_default)]
 impl ScratchBufferStore {
     pub fn new() -> ScratchBufferStore {
         ScratchBufferStore {
-            buffers_real: Arc::new(RefCell::new(ScratchBufferTypeStore::new())),
-            buffers_vector: Arc::new(RefCell::new(ScratchBufferTypeStore::new())),
+            buffers_real: Arc::new(Mutex::new(ScratchBufferTypeStore::new())),
+            buffers_vector: Arc::new(Mutex::new(ScratchBufferTypeStore::new())),
         }
     }
 
     pub fn get_buffer_real(&self, size: usize) -> ScratchBuffer<Real, Real> {
         ScratchBuffer::<Real, Real> {
-            buffer: self.buffers_real.borrow_mut().get_buffer(size, 0.0),
+            buffer: self.buffers_real.lock().unwrap().get_buffer(size, 0.0),
             store: Arc::clone(&self.buffers_real),
         }
     }
 
     pub fn get_buffer_uint(&self, size: usize) -> ScratchBuffer<u32, Real> {
         ScratchBuffer::<u32, Real> {
-            buffer: self.buffers_real.borrow_mut().get_buffer(size, 0),
+            buffer: self.buffers_real.lock().unwrap().get_buffer(size, 0),
             store: Arc::clone(&self.buffers_real),
         }
     }
 
     pub fn get_buffer_vector(&self, size: usize) -> ScratchBuffer<Vector, Vector> {
         ScratchBuffer::<Vector, Vector> {
-            buffer: self.buffers_vector.borrow_mut().get_buffer(size, Vector::zero()),
+            buffer: self.buffers_vector.lock().unwrap().get_buffer(size, Vector::zero()),
             store: Arc::clone(&self.buffers_vector),
         }
     }
 
     pub fn get_buffer_point(&self, size: usize) -> ScratchBuffer<Point, Vector> {
         ScratchBuffer::<Point, Vector> {
-            buffer: self.buffers_vector.borrow_mut().get_buffer(size, Point::origin()),
+            buffer: self.buffers_vector.lock().unwrap().get_buffer(size, Point::origin()),
             store: Arc::clone(&self.buffers_vector),
         }
     }
