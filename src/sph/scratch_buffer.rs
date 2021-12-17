@@ -1,6 +1,5 @@
 use crate::units::*;
 use cgmath::prelude::*;
-use std::cell::RefCell;
 use std::sync::{Arc, Mutex};
 
 pub struct ScratchBuffer<T: Copy, TStorage: Copy> {
