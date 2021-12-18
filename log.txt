@@ -14,5 +14,9 @@ Testing Rust SPH implementation
 
 #Plan
 1. Simulate particles physics without collisions (DONE)
-1. Add support for fast particle neighbour finding and add simple collisions (WIP)
+1. Add support for fast particle neighbour finding (DONE)
+1. setup camera coordinates seperate from simulation coordinates (DONE)
+1. integrate DFSPH solver from another opensource as example (DONE)
+1. make a simple particle collision solver (WIP)
+
 
