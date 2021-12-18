@@ -3,7 +3,7 @@
 # bevy-dfsph
 Testing Rust SPH implementation
 
-#Log
+# Log
 - tested different rust graphics engiens, including:
 	- wgpu: very powerfull but too low level, requires writing shaders, would like to start with something more simple and maybe later port to this
 	- rapier physics engine: too high level, every object must pass throgh its built-in collision system, too limiting
@@ -17,7 +17,7 @@ Testing Rust SPH implementation
 	- simulation works using bevy framework, simulation time is not following real time
 	- currently particle positions are copied from original data structure to bevy object tranforms, maybe can be optimized later
 
-#Plan
+# Plan
 1. Simulate particles physics without collisions (DONE)
 1. Add support for fast particle neighbour finding (DONE) using Morton code 2d mapping from  https://github.com/Wumpf/yasph2d (will need to update to 3d)
 1. setup camera coordinates seperate from simulation coordinates (DONE)
