@@ -63,7 +63,6 @@ const REALTIME_TO_SIMTIME_SCALE: f32 = 1.0;
 
 const TARGET_FRAME_SIMDURATION: Real = REALTIME_TO_SIMTIME_SCALE / TARGET_FPS;
 
-pub struct HelloPlugin;
 struct Particle;
 struct Velocity {
     translation: Vec3,
@@ -322,9 +321,8 @@ fn setup(
             ))
             .id();
     }
+
     commands.insert_resource(simState);
-    // commands.insert_resource(fluid_world);
-    // commands.insert_resource(sph_solver);
 }
 
 /// Applies gravity to all entities with velocity
