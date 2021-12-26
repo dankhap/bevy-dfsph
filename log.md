@@ -16,6 +16,8 @@ Testing Rust SPH implementation
 	- fixed camera coordindates (still need a better solution and use bevy tools
 	- simulation works using bevy framework, simulation time is not following real time
 	- currently particle positions are copied from original data structure to bevy object tranforms, maybe can be optimized later
+- found good source to better understand SPH: https://interactivecomputergraphics.github.io/SPH-Tutorial/pdf/SPH_Tutorial.pdf
+- 
 
 # Plan
 1. Simulate particles physics without collisions (DONE)
