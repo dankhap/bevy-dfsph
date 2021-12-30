@@ -16,6 +16,9 @@ use std::{
 };
 use bevy::render::camera::{Camera, CameraProjection, DepthCalculation, VisibleEntities};
 
+
+use itertools::linspace;
+
 struct SimpleOrthoProjection {
     far: f32,
     aspect: f32,
@@ -217,111 +220,77 @@ const CAMERA_SCALE: f32 = 300.0;
 
 fn main() {
     App::build()
-        .insert_resource(Msaa {samples: 8})
         .add_plugins(DefaultPlugins)
         .add_plugin(LogDiagnosticsPlugin::default())
         .add_plugin(FrameTimeDiagnosticsPlugin::default())
-        .add_plugin(ShapePlugin)
         .add_startup_system(setup.system())
-            /* .add_system(velocity_system.system()) */
         .add_system(move_system.system()) 
-        // .add_system(collision_system.system())
         .run();
 }
 
 
 fn setup(
     mut commands: Commands,
-    asset_server: Res<AssetServer>,
-    mut materials: ResMut<Assets<ColorMaterial>>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
 
-    commands.spawn_bundle(OrthographicCameraBundle::new_2d());
-    commands.spawn_bundle(UiCameraBundle::default());
-     // but with our custom projection
+    let mut camera = OrthographicCameraBundle::new_3d();
+    camera.orthographic_projection.scale = 2.0;
+    // camera.transform = Transform::from_xyz(5.0, 5.0, 5.0).looking_at(Vec3::ZERO, Vec3::Y);
+    camera.transform = Transform::from_xyz(5.0, 5.0, 5.0).looking_at(Vec3::ZERO, Vec3::Y);
 
-    // let projection = SimpleOrthoProjection::default();
+    // camera
+    commands.spawn_bundle(camera);
 
-    // Need to set the camera name to one of the bevy-internal magic constants,
-    // depending on which camera we are implementing (2D, 3D, or UI).
-    // Bevy uses this name to find the camera and configure the rendering.
-    // Since this example is a 2d camera:
-
-    // let cam_name = bevy::render::render_graph::base::camera::CAMERA_2D;
-
-    /* let mut camera = Camera::default();
-    camera.name = Some(cam_name.to_string());
-    commands.spawn_bundle((
-        // position the camera like bevy would do by default for 2D:
-        Transform::from_translation(Vec3::new(0.0, 0.0, projection.far - 0.1)),
-        GlobalTransform::default(),
-        VisibleEntities::default(),
-        camera,
-        projection,
-    )); */
-
-
+    let particle_size = 0.03;
     let simState = MainState::new();
     let particle_radius = simState.get_particale_radius(); //*CAMERA_SCALE;
 
-        let shape = shapes::RegularPolygon {
-                sides: 6,
-                feature: shapes::RegularPolygonFeature::Radius(particle_radius),
-                ..shapes::RegularPolygon::default()
-            };
-
     println!("nbumber of particales: {}",simState.get_particle_num());
     println!("radius of particales: {}",particle_radius);
+    
+    for z in linspace::<f32>(-0.1, 0.1, 8) {
 
-    for (p,vel) in simState.fluid_world.particles.positions.iter().zip(simState.fluid_world.particles.velocities.iter()) {
-        let velocity = Vec3::new(vel[0], vel[1], 0.0);
-        let pos = Point::new((p.x * CAMERA_SCALE) - 500.0, p.y * CAMERA_SCALE - 300.0);
-        println!("position of particales: {}, {}",pos.x, pos.y);
-        let transform = Transform::from_xyz(pos.x, pos.y, 0.0);
-        let e = commands
-            .spawn()
-            .insert_bundle((
-                Velocity {
-                    translation: velocity,
-                    rotation: 0.0
-                },
-            ))
-            .insert_bundle(GeometryBuilder::build_as(
-                &shape,
-                ShapeColors::outlined(Color::BLUE, Color::BLACK),
-                DrawMode::Outlined {
-                    fill_options: FillOptions::default(),
-                    outline_options: StrokeOptions::default().with_line_width(1.0),
-                },
-                transform,
-            ))
-            .id();
+        for (p,vel) in simState.fluid_world.particles.positions.iter().zip(simState.fluid_world.particles.velocities.iter()) {
+            let velocity = Vec3::new(vel[0], vel[1], 0.0);
+            // let pos = Point::new((p.x * CAMERA_SCALE) - 500.0, p.y * CAMERA_SCALE - 300.0);
+            let pos = Point::new(p.x , p.y );
+            println!("position of particales: {}, {}",pos.x, pos.y);
+            let transform = Transform::from_xyz(pos.x, pos.y, z);
+            commands
+                .spawn()
+                .insert_bundle((
+                    Velocity {
+                        translation: velocity,
+                        rotation: 0.0
+                    },
+                ))
+                .insert_bundle(PbrBundle {
+                    mesh: meshes.add(Mesh::from(shape::Icosphere {radius: 0.01, subdivisions: 1})),
+                    material: materials.add(Color::BLUE.into()),
+                    transform: transform,
+                    ..Default::default()
+                })
+                .id();
+        }
+
     }
+    /* for p in &simState.fluid_world.particles.boundary_particles {
 
-    for p in &simState.fluid_world.particles.boundary_particles {
-
-        let pos = Point::new((p.x * CAMERA_SCALE) - 500.0, p.y * CAMERA_SCALE -300.0);
-        // let pos = Point::new((p.x * 800.0) - 400.0, p.y * 800.0);
+        // let pos = Point::new((p.x * CAMERA_SCALE) - 500.0, p.y * CAMERA_SCALE -300.0);
+        let pos = Point::new(p.x , p.y );
         let transform = Transform::from_xyz(pos.x, pos.y, 0.0);
-        let shape = shapes::RegularPolygon {
-                sides: 6,
-                feature: shapes::RegularPolygonFeature::Radius(particle_radius),
-                ..shapes::RegularPolygon::default()
-            };
         commands
-            .spawn()
-            .insert_bundle(GeometryBuilder::build_as(
-                &shape,
-                ShapeColors::outlined(Color::GRAY, Color::BLACK),
-                DrawMode::Outlined {
-                    fill_options: FillOptions::default(),
-                    outline_options: StrokeOptions::default().with_line_width(1.0),
-                },
-                transform,
-            ))
+            .spawn_bundle(PbrBundle {
+                mesh: meshes.add(Mesh::from(shape::Icosphere {radius: 0.01, subdivisions: 1})),
+                material: materials.add(Color::GRAY.into()),
+                transform: transform,
+                ..Default::default()
+            })
             .id();
     }
-
+ */
     commands.insert_resource(simState);
 }
 
@@ -387,18 +356,16 @@ fn move_system(time: Res<Time>, mut simState: ResMut<MainState>, mut q: Query<(&
     let delta = time.delta_seconds();
     simState.single_sim_step();
     
-
-    for (i, (v, mut t)) in q.iter_mut().enumerate() {
-        let allp = &simState.fluid_world.particles.positions;
-        if allp.len() - 1 < i {
-            return
+    let total_real_particles = simState.fluid_world.particles.positions.len();
+    for (i, z) in linspace::<f32>(-0.1, 0.1, 8).enumerate() {
+        for (j, (v, mut t)) in q.iter_mut()
+            .enumerate()
+            .filter(|(l,k)| l >= &(i*total_real_particles) && l < &((i+1) * total_real_particles)) {
+             let p = &simState.fluid_world.particles.positions[j % total_real_particles];
+             
+             let transform = Vec3::new(p.x, p.y, z);
+             t.translation = transform;
         }
-        let p = allp[i];
-        let pos = Point::new((p.x * CAMERA_SCALE) - 500.0, p.y * CAMERA_SCALE - 300.0);
-        // println!("position of particales: {}, {}",pos.x, pos.y);
-        let transform = Vec3::new(pos.x, pos.y, 0.0);
-        t.translation = transform; 
-        // t.translation += delta * v.translation;
     }
 }
 

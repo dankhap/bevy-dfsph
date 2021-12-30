@@ -11,7 +11,7 @@ use rayon::prelude::*;
 // WCSPH implementation as described in
 // Divergence-Free SPH for Incompressible and Viscious Fluids
 // https://animation.rwth-aachen.de/publication/051/
-pub struct DFSPHSolver<TViscosityModel: ViscosityModel> {
+pub struct BounceSolver<TViscosityModel: ViscosityModel> {
     viscosity_model: TViscosityModel,
 
     kernel: smoothing_kernel::CubicSpline,
@@ -473,7 +473,7 @@ impl<TViscosityModel: ViscosityModel + std::marker::Sync> Solver for DFSPHSolver
     }
 
     fn simulation_step(&mut self, fluid_world: &mut FluidParticleWorld, time_manager: &mut TimeManager) {
-        microprofile::scope!("DFSPHSolver", "simulation_step");
+        microprofile::scope!("BounceSolver", "simulation_step");
 
         // ensure densities and alpha factors were initialized previously ("warmup")
         // Todo: Not happy about the way added particles are handled here. This sort of works for adding, but removing this way is impossible with this design!
@@ -496,7 +496,7 @@ impl<TViscosityModel: ViscosityModel + std::marker::Sync> Solver for DFSPHSolver
             let mut accellerations = fluid_world.scratch_buffers.get_buffer_vector(fluid_world.particles.positions.len());
 
             {
-                microprofile::scope!("DFSPHSolver", "non-pressure forces");
+                microprofile::scope!("BounceSolver", "non-pressure forces");
 
                 let non_pressure_forces: Vector = fluid_world.gravity * fluid_world.properties.particle_mass();
                 let particle_mass = fluid_world.properties.particle_mass();
@@ -520,6 +520,7 @@ impl<TViscosityModel: ViscosityModel + std::marker::Sync> Solver for DFSPHSolver
                             |j| {
                                 let j = j as usize;
                                 let r_sq = ri.distance2(particles.positions[j]);
+
                                 *a += viscosity_model.compute_viscous_accelleration(
                                     dt,
                                     r_sq,
