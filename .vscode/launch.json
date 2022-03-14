@@ -1,0 +1,65 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'bevysph'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=bevysph"
+                ],
+                "filter": {
+                    "name": "bevysph",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'bevysph'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=bevysph",
+                    "--package=bevysph"
+                ],
+                "filter": {
+                    "name": "bevysph",
+                    "kind": "bin"
+                }
+            },
+            "env": {"LD_LIBRARY_PATH": "${workspaceFolder}/taget/debug"},
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'bevysph'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=bevysph",
+                    "--package=bevysph"
+                ],
+                "filter": {
+                    "name": "bevysph",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}

@@ -1,18 +1,27 @@
-pub use dfsph::DFSPHSolver;
-pub use wscsph::WCSPHSolver;
+pub use dfsph3d::DFSPHSolver3D;
+// pub use wscsph::WCSPHSolver;
 
-mod dfsph;
-mod wscsph;
+mod dfsph3d;
+// mod wscsph;
 
 // ------------------------------------------------------
 
-use super::fluidparticleworld::FluidParticleWorld;
+use super::fluidparticleworld_3d::FluidParticleWorld3D;
 use super::timemanager::TimeManager;
 
-pub trait Solver {
+/* pub trait Solver {
     // todo: this is not elegant, should be done automatically
     fn clear_cached_data(&mut self);
 
     // performs a single simulation step.
     fn simulation_step(&mut self, fluid_world: &mut FluidParticleWorld, time_manager: &mut TimeManager);
+} */
+
+
+pub trait Solver3D {
+    // todo: this is not elegant, should be done automatically
+    fn clear_cached_data(&mut self);
+
+    // performs a single simulation step.
+    fn simulation_step(&mut self, fluid_world: &mut FluidParticleWorld3D, time_manager: &mut TimeManager);
 }

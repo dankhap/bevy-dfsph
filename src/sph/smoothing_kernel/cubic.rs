@@ -1,5 +1,5 @@
-use super::kernel::Kernel;
-use crate::units::{Real, Vector};
+use super::kernel3d::Kernel3D;
+use crate::units::{Real, Vector3D};
 
 /// Cubic Spline smoothing kernel.
 ///
@@ -22,7 +22,7 @@ impl CubicSpline {
     }
 }
 
-impl Kernel for CubicSpline {
+impl Kernel3D for CubicSpline {
     #[inline]
     fn evaluate(&self, _r_sq: Real, r: Real) -> Real {
         let q = r * self.h_inv;
@@ -38,7 +38,7 @@ impl Kernel for CubicSpline {
     }
 
     #[inline]
-    fn gradient(&self, ri_to_rj: Vector, _r_sq: Real, r: Real) -> Vector {
+    fn gradient(&self, ri_to_rj: Vector3D, _r_sq: Real, r: Real) -> Vector3D {
         let q = r * self.h_inv;
         if q <= 0.5 {
             self.normalizer_grad * q * (2.0 - q * 3.0) / r * ri_to_rj

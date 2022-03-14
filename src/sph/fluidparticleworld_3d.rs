@@ -5,8 +5,8 @@ use rand::rngs::SmallRng;
 use rayon::prelude::*;
 
 use super::neighborhood_search_3d::{NeighborhoodSearch, ParticleIndex};
-use super::scratch_buffer::ScratchBufferStore;
-use super::smoothing_kernel::Kernel;
+use super::scratch_buffer_3d::ScratchBufferStore;
+use super::smoothing_kernel::Kernel3D;
 
 pub struct Particles {
     pub positions: Vec<Point3D>,
@@ -167,7 +167,25 @@ impl FluidParticleWorld3D {
                     self.particles
                         .positions
                         .push(bottom_left + jitter + Vector3D::new(step * (x as Real), step * (y as Real), step * (z as Real)));
+                    
                 }
+                
+            }
+            
+        }
+    }
+
+
+    pub fn add_boundary_thick_plane(&mut self, start: Point3D, end: Point3D, thickness_in_particles: u32) {
+        let dir = (end - start).normalize();
+        let dir_perpendicular = Vector3D::new(-dir.y, dir.x, dir.z);
+        let thickness_world = thickness_in_particles as Real / self.properties.num_particles_per_meter();
+        let elongation = dir * thickness_world;
+        let mut offset = -dir_perpendicular * thickness_world;
+        let step = dir_perpendicular * thickness_world / thickness_in_particles as Real;
+        for _ in 0..thickness_in_particles {
+            self.add_boundary_line(start + offset, end + offset + elongation);
+            offset += step;
         }
     }
 
@@ -200,7 +218,7 @@ impl FluidParticleWorld3D {
         self.boundary_changed = true;
     }
 
-    pub(super) fn update_densities(&mut self, kernel: impl Kernel + std::marker::Sync) {
+    pub(super) fn update_densities(&mut self, kernel: impl Kernel3D + std::marker::Sync) {
         microprofile::scope!("FluidParticleWorld3D", "update_densities");
         assert_eq!(self.particles.positions.len(), self.particles.densities.len());
 
@@ -217,7 +235,7 @@ impl FluidParticleWorld3D {
             .enumerate()
             .for_each(|(i, (density, ri))| {
                 *density = kernel.evaluate(0.0, 0.0) * mass; // self-contribution
-                let i = i as u32;
+                let i = i as u64;
                 Particles::foreach_neighbor_particle_internal(
                     &neighborhood,
                     i,

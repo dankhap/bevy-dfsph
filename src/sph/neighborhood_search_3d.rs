@@ -3,11 +3,11 @@ use rayon::prelude::*;
 use std::cell::UnsafeCell;
 
 use super::appendbuffer::AppendBuffer;
-use super::scratch_buffer::ScratchBufferStore;
+use super::scratch_buffer_3d::ScratchBufferStore;
 use crate::units::*;
 
-pub type ParticleIndex = u32;
-pub type MortonCellIndex = u32;
+pub type ParticleIndex = u64;
+pub type MortonCellIndex = u64;
 
 #[derive(Copy, Clone)]
 struct MortonCellPos {
@@ -47,11 +47,11 @@ struct MortonCellNeihborhoodRuns {
 struct GridProperties {
     radius: Real,
     cell_size_inv: Real,
-    grid_min: Point,
+    grid_min: Point3D,
 }
 impl GridProperties {
     #[inline]
-    fn position_to_mortoncellpos(&self, position: Point) -> MortonCellPos {
+    fn position_to_mortoncellpos(&self, position: Point3D) -> MortonCellPos {
         let cellspace = (position - self.grid_min) * self.cell_size_inv;
         MortonCellPos {
             x: cellspace.x as u16,
@@ -61,7 +61,7 @@ impl GridProperties {
     }
 
     #[inline]
-    fn position_to_cidx(&self, position: Point) -> MortonCellIndex {
+    fn position_to_cidx(&self, position: Point3D) -> MortonCellIndex {
         self.position_to_mortoncellpos(position).to_cidx()
     }
 }
@@ -87,8 +87,8 @@ impl CompactMortonCellGrid {
         &mut self,
         scratch_buffers: &mut ScratchBufferStore,
         grid: &GridProperties,
-        positions: &mut Vec<Point>,
-        particle_attributes_vector: &mut [&mut Vec<Vector>],
+        positions: &mut Vec<Point3D>,
+        particle_attributes_vector: &mut [&mut Vec<Vector3D>],
         particle_attributes_real: &mut [&mut Vec<Real>],
     ) {
         microprofile::scope!("NeighborhoodSearch", "CompactMortonCellGrid::update");
@@ -211,6 +211,10 @@ impl CompactMortonCellGrid {
                 if num_misses > MAX_CONSECUTIVE_CELL_MISSES {
                     let expected_next_cidx = super::morton_3d::find_bigmin(cell.cidx, cidx_min, cidx_max);
                     cell_arrayidx += Self::find_next_cell(&self.cells[cell_arrayidx..], expected_next_cidx);
+                    if expected_next_cidx <= cell.cidx {
+                        /* println!("unexpected cell calculated! expected: {0}, cell.cidx: {1}", expected_next_cidx, cell.cidx);
+                        println!("number of misses: {0}", num_misses); */
+                    }
                     assert!(expected_next_cidx > cell.cidx);
                 } else {
                     cell_arrayidx += 1;
@@ -221,6 +225,7 @@ impl CompactMortonCellGrid {
                     return runs;
                 }
             }
+            // println!("found inside index!");
 
             // find particle run
             runs.particle_index_runs[runs.num_runs].0 = cell.first_particle;
@@ -252,7 +257,7 @@ impl CompactMortonCellGrid {
     }
 
     // todo: remove, impl already no longer optimal
-    pub fn foreach_potential_neighbor(&self, grid: &GridProperties, position: Point, mut f: impl FnMut(usize) -> ()) {
+    pub fn foreach_potential_neighbor(&self, grid: &GridProperties, position: Point3D, mut f: impl FnMut(usize) -> ()) {
         let runs = self.get_particle_runs_in_neighborbox(grid.position_to_cidx(position));
         for range in runs.particle_index_runs.iter() {
             for j in range.0..range.1 {
@@ -289,9 +294,9 @@ impl NeighborLists {
     fn try_update(
         &mut self,
         grid: &GridProperties,
-        positions: &[Point],
+        positions: &[Point3D],
         cell_grid: &CompactMortonCellGrid,
-        neighbor_positions: &[Point],
+        neighbor_positions: &[Point3D],
         neighbor_cell_grid: &CompactMortonCellGrid,
     ) -> Result<usize, usize> {
         microprofile::scope!("NeighborhoodSearch", "NeighborLists::try_update");
@@ -327,7 +332,7 @@ impl NeighborLists {
                         let posj = unsafe { *neighbor_positions.get_unchecked(j) };
                         let distsq = posi.distance2(posj);
                         if distsq <= radius_sq && distsq > MIN_DISTANCE {
-                            neighbor_set[num_neighbors] = j as u32;
+                            neighbor_set[num_neighbors] = j as u64;
                             num_neighbors += 1;
                             if num_neighbors == MAX_NUM_NEIGHBORS {
                                 println!("particle has too many neighbors");
@@ -353,9 +358,9 @@ impl NeighborLists {
     fn update(
         &mut self,
         grid: &GridProperties,
-        positions: &[Point],
+        positions: &[Point3D],
         cell_grid: &CompactMortonCellGrid,
-        neighbor_positions: &[Point],
+        neighbor_positions: &[Point3D],
         neighbor_cell_grid: &CompactMortonCellGrid,
     ) {
         microprofile::scope!("NeighborhoodSearch", "NeighborLists::update");
@@ -424,7 +429,7 @@ impl NeighborhoodSearch {
                 cell_size_inv: 1.0 / cell_size,
                 // todo: we can create a huge domain, but still there is a limited domain! should be safe about this and have a max
                 // limit is there because our morton curve wraps around at some point and then things get complicated (aka don't want to deal with this!)
-                grid_min: Point::new(-100.0, -100.0),
+                grid_min: Point3D::new(-100.0, -100.0, -100.0),
             },
 
             cellgrid_particles: Default::default(),
@@ -436,7 +441,7 @@ impl NeighborhoodSearch {
     }
 
     // todo: allow boundaries to have properties
-    pub fn update_boundary(&mut self, scratch_buffers: &mut ScratchBufferStore, positions: &mut Vec<Point>) {
+    pub fn update_boundary(&mut self, scratch_buffers: &mut ScratchBufferStore, positions: &mut Vec<Point3D>) {
         microprofile::scope!("NeighborhoodSearch", "update_boundary");
         self.cellgrid_boundary.update(scratch_buffers, &self.grid, positions, &mut [], &mut []);
     }
@@ -444,10 +449,10 @@ impl NeighborhoodSearch {
     pub fn update_particle_neighbors(
         &mut self,
         scratch_buffers: &mut ScratchBufferStore,
-        particle_positions: &mut Vec<Point>,
-        particle_attributes_vector: &mut [&mut Vec<Vector>],
+        particle_positions: &mut Vec<Point3D>,
+        particle_attributes_vector: &mut [&mut Vec<Vector3D>],
         particle_attributes_real: &mut [&mut Vec<Real>],
-        boundary_positions: &[Point],
+        boundary_positions: &[Point3D],
     ) {
         microprofile::scope!("NeighborhoodSearch", "update_particle_neighbors");
         self.cellgrid_particles.update(
@@ -495,11 +500,11 @@ impl NeighborhoodSearch {
         self.particle_boundary_neighbors.num_neighbors(particle)
     }
 
-    pub fn foreach_potential_neighbor(&self, position: Point, f: impl FnMut(usize) -> ()) {
+    pub fn foreach_potential_neighbor(&self, position: Point3D, f: impl FnMut(usize) -> ()) {
         self.cellgrid_particles.foreach_potential_neighbor(&self.grid, position, f)
     }
 
-    pub fn foreach_potential_boundary_neighbor(&self, position: Point, f: impl FnMut(usize) -> ()) {
+    pub fn foreach_potential_boundary_neighbor(&self, position: Point3D, f: impl FnMut(usize) -> ()) {
         self.cellgrid_boundary.foreach_potential_neighbor(&self.grid, position, f)
     }
 }
@@ -516,7 +521,7 @@ mod tests {
         const SEARCH_RADIUS: Real = 1.0;
 
         let mut rng: rand::rngs::SmallRng = rand::SeedableRng::seed_from_u64(123456789);
-        let mut positions: Vec<Point> = std::iter::repeat_with(|| Point::from_vec(rng.gen::<Vector>() * (NUM_POSITIONS as Real / DENSITY).sqrt()))
+        let mut positions: Vec<Point3D> = std::iter::repeat_with(|| Point3D::from_vec(rng.gen::<Vector3D>() * (NUM_POSITIONS as Real / DENSITY).sqrt()))
             .take(NUM_POSITIONS)
             .collect();
 
@@ -544,7 +549,7 @@ mod tests {
         const SEARCH_RADIUS: Real = 1.0;
 
         let mut rng: rand::rngs::SmallRng = rand::SeedableRng::seed_from_u64(123456789);
-        let mut positions: Vec<Point> = std::iter::repeat_with(|| Point::from_vec(rng.gen::<Vector>() * (NUM_POSITIONS as Real / DENSITY).sqrt()))
+        let mut positions: Vec<Point3D> = std::iter::repeat_with(|| Point3D::from_vec(rng.gen::<Vector3D>() * (NUM_POSITIONS as Real / DENSITY).sqrt()))
             .take(NUM_POSITIONS)
             .collect();
 

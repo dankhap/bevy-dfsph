@@ -1,9 +1,9 @@
-use super::super::fluidparticleworld_3d::FluidParticleWorld3D3D;
+use super::super::fluidparticleworld_3d::FluidParticleWorld3D;
 use super::super::smoothing_kernel;
-use super::super::smoothing_kernel::Kernel;
+use super::super::smoothing_kernel::Kernel3D;
 use super::super::timemanager::TimeManager;
 use super::super::viscositymodel::ViscosityModel;
-use super::Solver;
+use super::Solver3D;
 use crate::units::*;
 use cgmath::prelude::*;
 use rayon::prelude::*;
@@ -63,7 +63,7 @@ impl<TViscosityModel: ViscosityModel + std::marker::Sync> DFSPHSolver3D<TViscosi
     // (Note that the newer Eurographics SPH Tutorial from 2019 https://interactivecomputergraphics.github.io/SPH-Tutorial/pdf/SPH_Tutorial.pdf actually works with density-squared!)
     // However, all uses of the factor in the paper divide density again, so no need for having it in here in the first place!
     // (seemed to make sense for derivation though :))
-    fn compute_alpha_factors(alpha_values: &mut Vec<Real>, fluid_world: &FluidParticleWorld3D, kernel: impl Kernel + std::marker::Sync) {
+    fn compute_alpha_factors(alpha_values: &mut Vec<Real>, fluid_world: &FluidParticleWorld3D, kernel: impl Kernel3D + std::marker::Sync) {
         microprofile::scope!("DFSPHSolver3D", "compute_alpha_factors");
         const EPSILON: Real = 1e-6;
         let particle_mass = fluid_world.properties.particle_mass();
@@ -76,7 +76,7 @@ impl<TViscosityModel: ViscosityModel + std::marker::Sync> DFSPHSolver3D<TViscosi
                 // self contribution is zero since gradient to self is zero
                 let mut gradient_square_sum = 0.0;
                 let mut gradient_sum = Vector3D::zero();
-                let i = i as u32;
+                let i = i as u64;
                 particles.foreach_neighbor_particle(
                     i,
                     #[inline(always)]
@@ -114,7 +114,7 @@ impl<TViscosityModel: ViscosityModel + std::marker::Sync> DFSPHSolver3D<TViscosi
             .enumerate()
             .for_each(|(i, (density_error_i, (&original_density, &pos_i, &velocity_vi)))| {
                 let mut delta = 0.0; // gradient to self is zero.
-                let i = i as u32;
+                let i = i as u64;
                 particles.foreach_neighbor_particle(
                     i,
                     #[inline(always)]
@@ -161,7 +161,7 @@ impl<TViscosityModel: ViscosityModel + std::marker::Sync> DFSPHSolver3D<TViscosi
                 // compared to k values in paper already divided with density
                 // collapsing divition of dt² with multiply later -> divide delta with dt
 
-                let i = i as u32;
+                let i = i as u64;
                 particles.foreach_neighbor_particle(
                     i,
                     #[inline(always)]
@@ -203,7 +203,7 @@ impl<TViscosityModel: ViscosityModel + std::marker::Sync> DFSPHSolver3D<TViscosi
 
                 // collapsing division of dt with multiply later -> nothing!
 
-                let i = i as u32;
+                let i = i as u64;
                 particles.foreach_neighbor_particle(
                     i,
                     #[inline(always)]
@@ -289,7 +289,7 @@ impl<TViscosityModel: ViscosityModel + std::marker::Sync> DFSPHSolver3D<TViscosi
             .zip((&fluid_world.particles.positions, velocities).into_par_iter())
             .enumerate()
             .for_each(|(i, (density_change_i, (&ri, &velocity_vi)))| {
-                let i = i as u32;
+                let i = i as u64;
 
                 // particle deficiency?
                 if particles.num_total_neighbors(i) < 9 {
@@ -341,7 +341,7 @@ impl<TViscosityModel: ViscosityModel + std::marker::Sync> DFSPHSolver3D<TViscosi
                 // compared to k values in paper already divided with density
                 // collapsing division of dt with multiply later -> nothing!
 
-                let i = i as u32;
+                let i = i as u64;
                 particles.foreach_neighbor_particle(
                     i,
                     #[inline(always)]
@@ -381,7 +381,7 @@ impl<TViscosityModel: ViscosityModel + std::marker::Sync> DFSPHSolver3D<TViscosi
 
                 // collapsing division of dt with multiply later -> nothing!
 
-                let i = i as u32;
+                let i = i as u64;
                 particles.foreach_neighbor_particle(
                     i,
                     #[inline(always)]
@@ -463,7 +463,7 @@ impl<TViscosityModel: ViscosityModel + std::marker::Sync> DFSPHSolver3D<TViscosi
     }
 }
 
-impl<TViscosityModel: ViscosityModel + std::marker::Sync> Solver for DFSPHSolver3D<TViscosityModel> {
+impl<TViscosityModel: ViscosityModel + std::marker::Sync> Solver3D for DFSPHSolver3D<TViscosityModel> {
     fn clear_cached_data(&mut self) {
         self.alpha_values.clear();
         self.warmstart_stiffness.clear();
@@ -515,7 +515,7 @@ impl<TViscosityModel: ViscosityModel + std::marker::Sync> Solver for DFSPHSolver
 
                         // viscosity
                         particles.foreach_neighbor_particle(
-                            i as u32,
+                            i as u64,
                             #[inline(always)]
                             |j| {
                                 let j = j as usize;

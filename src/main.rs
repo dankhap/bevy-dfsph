@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use bevy::diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin};
-use bevy_prototype_lyon::prelude::*;
+// use bevy_prototype_lyon::prelude::*;
 // use cgmath::prelude::*;
 use std::collections::VecDeque;
 use std::time::{Duration, Instant};
@@ -8,7 +8,7 @@ mod camera;
 
 use std::sync::{Arc, Mutex};
 use bevysph::sph;
-use bevysph::units::{Point, Real, Rect};
+use bevysph::units::{Point, Real, Rect3D};
 
 use rand::{prelude::SliceRandom, Rng};
 use std::{
@@ -86,9 +86,9 @@ struct ContributorSelection {
 }
 
 struct MainState {
-    fluid_world: sph::FluidParticleWorld,
+    fluid_world: sph::FluidParticleWorld3D,
     time_manager: sph::TimeManager,
-    sph_solver: Arc<Mutex<dyn sph::Solver + Send>>,
+    sph_solver: Arc<Mutex<dyn sph::Solver3D + Send>>,
 
     simulation_step_duration_history: VecDeque<Duration>,
     simulation_processing_time_frame: Duration,
@@ -105,19 +105,19 @@ struct MainState {
 impl MainState {
     pub fn new() -> MainState {
 
-        let mut fluid_world = sph::FluidParticleWorld::new(
+        let mut fluid_world = sph::FluidParticleWorld3D::new(
             2.0,    // smoothing factor
             1000.0, // #1660, 5000 particles/m²
             100.0,  // density of water (? this is 2d, not 3d where it's 1000 kg/m³)
         );
-        let xsph = sph::XSPHViscosityModel::new(fluid_world.properties.smoothing_length());
+        let xsph = sph::XSPHViscosityModel3D::new(fluid_world.properties.smoothing_length());
         //xsph.epsilon = 0.1;
-        let mut physicalviscosity = 
+        /* let mut physicalviscosity = 
             sph::PhysicalViscosityModel::new(fluid_world.properties.smoothing_length());
-        physicalviscosity.fluid_viscosity = 0.01;
+        physicalviscosity.fluid_viscosity = 0.01; */
 
-        let sph_solver: Arc<Mutex<dyn sph::Solver + Send> > = 
-            Arc::new(Mutex::new(sph::DFSPHSolver::new(xsph, fluid_world.properties.smoothing_length())));
+        let sph_solver: Arc<Mutex<dyn sph::Solver3D + Send> > = 
+            Arc::new(Mutex::new(sph::DFSPHSolver3D::new(xsph, fluid_world.properties.smoothing_length())));
 
 
         // let main_state = MainState::new)
@@ -163,20 +163,21 @@ impl MainState {
         return self.fluid_world.particles.positions.len();
     }
 
-    fn reset_fluid(fluid_world: &mut sph::FluidParticleWorld) {
+    fn reset_fluid(fluid_world: &mut sph::FluidParticleWorld3D) {
         fluid_world.remove_all_fluid_particles();
         fluid_world.remove_all_boundary_particles();
 
-        fluid_world.add_fluid_rect(&Rect::new(0.1, 0.7, 0.5, 1.0), 0.05);
-        fluid_world.add_boundary_thick_line(Point::new(0.0, 0.0), Point::new(2.0, 0.0), 2);
-        fluid_world.add_boundary_thick_line(Point::new(0.0, 0.0), Point::new(0.0, 2.5), 2);
-        fluid_world.add_boundary_thick_line(Point::new(2.0, 0.0), Point::new(2.0, 2.5), 2);
+        fluid_world.add_fluid_rect(&Rect3D::new(0.1, 0.7, -0.1, 0.5, 1.0, 0.2), 0.05);
 
-        fluid_world.add_boundary_line(Point::new(0.0, 0.6), Point::new(1.75, 0.5));
+        /* fluid_world.add_boundary_thick_plane(Point3D::new(0.0, 0.0, -0.1), Point3D::new(2.0, 0.0, 0.1), 2);
+        fluid_world.add_boundary_thick_plane(Point3D::new(0.0, 0.0, -0.1), Point3D::new(0.0, 2.5, 0.1), 2);
+        fluid_world.add_boundary_thick_plane(Point3D::new(2.0, 0.0, -0.1), Point3D::new(2.0, 2.5, 0.1), 2);
 
+        fluid_world.add_boundary_plane(Point3D::new(0.0, 0.6, -0.1), Point3D::new(1.75, 0.5, 0.1));
+ */
         // close of the container - stop gap solution for issues with endlessly falling particles
         // (mostly a problem for adaptive timestep but potentially also for neighborhood search)
-        fluid_world.add_boundary_thick_line(Point::new(0.0, 2.5), Point::new(2.0, 2.5), 2);
+        // fluid_world.add_boundary_thick_plane(Point3D::new(0.0, 2.5, -0.1), Point::new(2.0, 2.5, 0.1), 2);
     }
 
     fn single_sim_step(&mut self) {
@@ -236,7 +237,7 @@ fn setup(
 ) {
 
     let mut camera = OrthographicCameraBundle::new_3d();
-    camera.orthographic_projection.scale = 2.0;
+    camera.orthographic_projection.scale = 1.0;
     // camera.transform = Transform::from_xyz(5.0, 5.0, 5.0).looking_at(Vec3::ZERO, Vec3::Y);
     camera.transform = Transform::from_xyz(5.0, 5.0, 5.0).looking_at(Vec3::ZERO, Vec3::Y);
 

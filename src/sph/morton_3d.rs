@@ -1,6 +1,6 @@
-pub const MORTON_XBITS: u32 = 0b01001001_00100100_10010010_01001001
-pub const MORTON_YBITS: u32 = 0b10010010_01001001_00100100_10010010
-pub const MORTON_ZBITS: u32 = 0b00100100_10010010_01001001_00100100
+pub const MORTON_XBITS: u64 = 0b10010010_01001001_00100100_10010010_01001001_00100100_10010010_01001001;
+pub const MORTON_YBITS: u64 = 0b00100100_10010010_01001001_00100100_10010010_01001001_00100100_10010010;
+pub const MORTON_ZBITS: u64 = 0b01001001_00100100_10010010_01001001_00100100_10010010_01001001_00100100;
 
 // Encodes two 16(!) bit numbers into a single 32bit morton code by interleaving the bits.
 //
@@ -51,8 +51,8 @@ fn part_1by1(x: u16) -> u32 {
 
 
 #[inline]
-fn part_1by2(x: u16) -> u32 {
-    let mut x = x as u32;               
+fn part_1by2(x: u16) -> u64 {
+    let mut x = x as u64;               
     x &= 0x000003ff;                  // x = ---- ---- ---- ---- ---- --98 7654 3210
     x = (x ^ (x << 16)) & 0xff0000ff; // x = ---- --98 ---- ---- ---- ---- 7654 3210
     x = (x ^ (x <<  8)) & 0x0300f00f; // x = ---- --98 ---- ---- 7654 ---- ---- 3210
@@ -63,7 +63,7 @@ fn part_1by2(x: u16) -> u32 {
 
 // Encodes three 16(!) bit numbers into a single 32bit number by interleaving the bits.
 #[inline]
-pub fn encode_bitfiddle(x: u16, y: u16, z: u16) -> u32 {
+pub fn encode_bitfiddle(x: u16, y: u16, z: u16) -> u64 {
     (part_1by2(z) << 2) + (part_1by2(y) << 1) + part_1by2(x)
 }
 
@@ -82,31 +82,31 @@ fn compact_1by1(x: u32) -> u32 {
 }
 
 // Inverse of Part1By2 - "delete" all bits not at positions divisible by 3
-fn compact_1by2(x: u32) -> u32 {
+fn compact_1by2(x: u64) -> u32 {
   let mut x = x;
   x &= 0x09249249;                  // x = ---- 9--8 --7- -6-- 5--4 --3- -2-- 1--0
   x = (x ^ (x >>  2)) & 0x030c30c3; // x = ---- --98 ---- 76-- --54 ---- 32-- --10
   x = (x ^ (x >>  4)) & 0x0300f00f; // x = ---- --98 ---- ---- 7654 ---- ---- 3210
   x = (x ^ (x >>  8)) & 0xff0000ff; // x = ---- --98 ---- ---- ---- ---- 7654 3210
   x = (x ^ (x >> 16)) & 0x000003ff; // x = ---- ---- ---- ---- ---- --98 7654 3210
-  x
+  x as u32
 }
 
 // Decodes x part of 2d morton code.
 #[inline]
-pub fn decode_x_bitfiddle(morton: u32) -> u32 {
+pub fn decode_x_bitfiddle(morton: u64) -> u32 {
     compact_1by2(morton)
 }
 
 // Decodes y part of 2d morton code.
 #[inline]
-pub fn decode_y_bitfiddle(morton: u32) -> u32 {
+pub fn decode_y_bitfiddle(morton: u64) -> u32 {
     compact_1by2(morton >> 1)
 }
 
 // Decodes z part of 2d morton code.
 #[inline]
-pub fn decode_z_bitfiddle(morton: u32) -> u32 {
+pub fn decode_z_bitfiddle(morton: u64) -> u32 {
     compact_1by2(morton >> 2)
 }
 
@@ -145,7 +145,7 @@ pub fn encode_lookup(x: u16, y: u16) -> u32 {
 
 // determines if a given morton code is within a rectangle given by morton codes\
 #[allow(dead_code)]
-pub(super) fn is_in_rect(m_cur: u32, min_morton: u32, max_morton: u32) -> bool {
+pub(super) fn is_in_rect(m_cur: u64, min_morton: u64, max_morton: u64) -> bool {
     let max_morton_xbits = max_morton & MORTON_XBITS;
     let max_morton_ybits = max_morton & MORTON_YBITS;
     let max_morton_zbits = max_morton & MORTON_ZBITS;
@@ -157,8 +157,8 @@ pub(super) fn is_in_rect(m_cur: u32, min_morton: u32, max_morton: u32) -> bool {
 }
 
 // determines if a given morton code is within a rectangle given by pre-split morton codes
-pub(super) fn is_in_rect_presplit(m_cur: u32, min_morton_xbits: u32, min_morton_ybits: u32, min_morton_zbits: u32, 
-                                              max_morton_xbits: u32, max_morton_ybits: u32, max_morton_zbits: u32 ) -> bool {
+pub(super) fn is_in_rect_presplit(m_cur: u64, min_morton_xbits: u64, min_morton_ybits: u64, min_morton_zbits: u64, 
+                                              max_morton_xbits: u64, max_morton_ybits: u64, max_morton_zbits: u64 ) -> bool {
     let cur_x = m_cur & MORTON_XBITS;
     let cur_y = m_cur & MORTON_YBITS;
     let cur_z = m_cur & MORTON_ZBITS;
@@ -174,7 +174,14 @@ pub(super) fn is_in_rect_presplit(m_cur: u32, min_morton_xbits: u32, min_morton_
 // Example:
 //   bit pattern 1011 (patternlen==8) for dim=1=y is first spread out 1x0x_1x1x
 //   then all these bits are replaced in value so if value was 1111_1111_0011_1111, it is now 1111_1111_1001_1111
-fn load_bits(pattern: u32, patternlen: u32, value: u32, dim: u32) -> u32 {
+//
+//
+//
+//
+//   bit pattern 1011 (patternlen==12) for dim=1=y is spread out x1xx_0xx1_xx1x
+//   1111_1111_0011_1111, it is now 1111_1111_0011_1111
+//
+fn load_bits(pattern: u64, patternlen: u64, value: u64, dim: u64) -> u64 {
     let wipe_mask = !(part_1by2(0xffff >> (16 - (patternlen / 2 + 1))) << dim); // clears affected bits
     let pattern = part_1by2(pattern as u16) << dim; // spreads pattern
     (value & wipe_mask) | pattern
@@ -188,11 +195,11 @@ fn load_bits(pattern: u32, patternlen: u32, value: u32, dim: u32) -> u32 {
 // http://hermanntropf.de/media/multidimensionalrangequery.pdf
 // https://web.archive.org/web/20180311015006/https://docs.raima.com/rdme/9_1/Content/GS/POIexample.htm
 // https://stackoverflow.com/questions/30170783/how-to-use-morton-orderz-order-curve-in-range-search
-pub fn find_bigmin(m_cur: u32, min_morton: u32, max_morton: u32) -> u32 {
+pub fn find_bigmin(m_cur: u64, min_morton: u64, max_morton: u64) -> u64 {
     let mut min_morton = min_morton;
     let mut max_morton = max_morton;
     let mut bigmin = 0;
-    for bitpos in (0..32_u32).rev() {
+    for bitpos in (0..48_u64).rev() {
         let setbit = 1 << bitpos;
         let curbit = (m_cur & setbit) != 0;
         let minbit = (min_morton & setbit) != 0;
@@ -201,8 +208,8 @@ pub fn find_bigmin(m_cur: u32, min_morton: u32, max_morton: u32) -> u32 {
         match (curbit, minbit, maxbit) {
             (false, false, false) => (),
             (false, false, true) => {
-                let dim = bitpos % 3; // dim = 0 for x; dim = 1 for y
-                let mask = 1 << (bitpos / 2);
+                let dim = bitpos % 3; // dim = 0 for x; dim = 1 for y; dim = 2 for z;
+                let mask = 1 << (bitpos / 3);
                 bigmin = load_bits(mask, bitpos, min_morton, dim);
                 max_morton = load_bits(mask - 1, bitpos, max_morton, dim);
             }
@@ -211,7 +218,7 @@ pub fn find_bigmin(m_cur: u32, min_morton: u32, max_morton: u32) -> u32 {
             (true, false, false) => return bigmin,
             (true, false, true) => {
                 let dim = bitpos % 3; // dim = 0 for x; dim = 1 for y
-                let mask = 1 << (bitpos / 2);
+                let mask = 1 << (bitpos / 3);
                 min_morton = load_bits(mask, bitpos, min_morton, dim)
             }
             (true, true, false) => unsafe { std::hint::unreachable_unchecked() },

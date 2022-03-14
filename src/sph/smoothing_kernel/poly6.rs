@@ -1,5 +1,5 @@
-use super::kernel::Kernel;
-use crate::units::{Real, Vector};
+use super::kernel3d::Kernel3D;
+use crate::units::{Real, Vector3D};
 
 /// Poly6 smoothing kernel.
 ///
@@ -23,7 +23,7 @@ impl Poly6 {
     }
 }
 
-impl Kernel for Poly6 {
+impl Kernel3D for Poly6 {
     #[inline]
     fn evaluate(&self, r_sq: Real, _r: Real) -> Real {
         let dsq = (self.hsq - r_sq).max(0.0);
@@ -31,7 +31,7 @@ impl Kernel for Poly6 {
     }
 
     #[inline]
-    fn gradient(&self, ri_to_rj: Vector, r_sq: Real, _r: Real) -> Vector {
+    fn gradient(&self, ri_to_rj: Vector3D, r_sq: Real, _r: Real) -> Vector3D {
         let hsq_sub_rsq = (self.hsq - r_sq).max(0.0);
         self.normalizer_grad * hsq_sub_rsq * hsq_sub_rsq * ri_to_rj
     }
