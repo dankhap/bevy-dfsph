@@ -43,7 +43,7 @@ impl Particles {
 
     // Can be useful to determine particle deficiency. Not used right now.
     #[inline]
-    pub(super) fn num_total_neighbors(&self, pidx: ParticleIndex) -> u32 {
+    pub(super) fn num_total_neighbors(&self, pidx: ParticleIndex) -> u64 {
         self.neighborhood.num_neighbors(pidx) + self.neighborhood.num_boundary_neighbors(pidx)
     }
 }
@@ -227,7 +227,7 @@ impl FluidParticleWorld3D {
         let neighborhood = &self.particles.neighborhood;
         let positions = &self.particles.positions;
         let boundary_positions = &self.particles.boundary_particles;
-
+        println!("boundary_positions: {0}", boundary_positions.len());
         self.particles
             .densities
             .par_iter_mut()
@@ -251,6 +251,7 @@ impl FluidParticleWorld3D {
                     i,
                     #[inline(always)]
                     |j| {
+                        println!("processing boundary neighborhood {0}", j);
                         let r_sq = ri.distance2(unsafe { *boundary_positions.get_unchecked(j as usize) });
                         let density_contribution = kernel.evaluate(r_sq, r_sq.sqrt()) * mass;
                         *density += density_contribution;
@@ -261,6 +262,7 @@ impl FluidParticleWorld3D {
                 // https://github.com/InteractiveComputerGraphics/SPlisHSPlasH/issues/36#issuecomment-495883932
                 *density = density.max(fluid_density);
             });
+        println!("finish up density");
     }
 
     // sorts particle attributes internally!

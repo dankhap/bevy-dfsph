@@ -53,15 +53,15 @@ fn part_1by1(x: u16) -> u32 {
 #[inline]
 fn part_1by2(x: u16) -> u64 {
     let mut x = x as u64;               
-    x &= 0x000003ff;                  // x = ---- ---- ---- ---- ---- --98 7654 3210
-    x = (x ^ (x << 16)) & 0xff0000ff; // x = ---- --98 ---- ---- ---- ---- 7654 3210
-    x = (x ^ (x <<  8)) & 0x0300f00f; // x = ---- --98 ---- ---- 7654 ---- ---- 3210
-    x = (x ^ (x <<  4)) & 0x030c30c3; // x = ---- --98 ---- 76-- --54 ---- 32-- --10
-    x = (x ^ (x <<  2)) & 0x09249249; // x = ---- 9--8 --7- -6-- 5--4 --3- -2-- 1--0
+    // x &= 0x000003ff;                 //  x = ---- ---- ---- ---- ---- ---- ---- ---- fedc ba98 7654 3210
+    x = (x ^ (x << 16)) & 0x0000ff0000ff; // x = ---- ---- ---- ---- fedc ba98 ---- ---- ---- ---- 7654 3210
+    x = (x ^ (x <<  8)) & 0x00f00f00f00f; // x = ---- ---- fedc ---- ---- ba98 ---- ---- 7654 ---- ---- 3210
+    x = (x ^ (x <<  4)) & 0x0c30c30c30c3; // x = ---- fe-- --dc ---- ba-- --98 ---- 76-- --54 ---- 32-- --10
+    x = (x ^ (x <<  2)) & 0x249249249249; // x = --f- -e-- d--c --b- -a-- 9--8 --7- -6-- 5--4 --3- -2-- 1--0
     x
 }
 
-// Encodes three 16(!) bit numbers into a single 32bit number by interleaving the bits.
+// Encodes three 16(!) bit numbers into a single 48(64)bit number by interleaving the bits.
 #[inline]
 pub fn encode_bitfiddle(x: u16, y: u16, z: u16) -> u64 {
     (part_1by2(z) << 2) + (part_1by2(y) << 1) + part_1by2(x)
@@ -84,11 +84,11 @@ fn compact_1by1(x: u32) -> u32 {
 // Inverse of Part1By2 - "delete" all bits not at positions divisible by 3
 fn compact_1by2(x: u64) -> u32 {
   let mut x = x;
-  x &= 0x09249249;                  // x = ---- 9--8 --7- -6-- 5--4 --3- -2-- 1--0
-  x = (x ^ (x >>  2)) & 0x030c30c3; // x = ---- --98 ---- 76-- --54 ---- 32-- --10
-  x = (x ^ (x >>  4)) & 0x0300f00f; // x = ---- --98 ---- ---- 7654 ---- ---- 3210
-  x = (x ^ (x >>  8)) & 0xff0000ff; // x = ---- --98 ---- ---- ---- ---- 7654 3210
-  x = (x ^ (x >> 16)) & 0x000003ff; // x = ---- ---- ---- ---- ---- --98 7654 3210
+  x &= 0x249249249249;                  // x = ---- 9--8 --7- -6-- 5--4 --3- -2-- 1--0
+  x = (x ^ (x >>  2)) & 0x0c30c30c30c3; // x = ---- --98 ---- 76-- --54 ---- 32-- --10
+  x = (x ^ (x >>  4)) & 0x00f00f00f00f; // x = ---- --98 ---- ---- 7654 ---- ---- 3210
+  x = (x ^ (x >>  8)) & 0x0000ff0000ff; // x = ---- --98 ---- ---- ---- ---- 7654 3210
+  x = (x ^ (x >> 16)) & 0x00000000ffff; // x = ---- ---- ---- ---- ---- --98 7654 3210
   x as u32
 }
 
@@ -246,12 +246,20 @@ mod tests {
 
         #[test]
         fn bitfiddle_works_for_examples() {
-            assert_eq!(encode_bitfiddle(2, 2), 12);
-            assert_eq!(encode_bitfiddle(3, 6), 45);
-            assert_eq!(encode_bitfiddle(4, 0), 16);
+            assert_eq!(encode_bitfiddle(2, 2, 2), 56);
+            println!("res 2,2,2: {0}", encode_bitfiddle(2, 2, 2));
+            assert_eq!(encode_bitfiddle(3, 6, 9), 2205); //45
+            println!("res 3,6,9: {0}", encode_bitfiddle(3, 6, 9));
+            assert_eq!(encode_bitfiddle(4, 0, 0), 64);
+            println!("res 4,0,0: {0}", encode_bitfiddle(4, 0, 0));
             assert_eq!(
-                encode_bitfiddle(0b1111_0001_0010_0000, 0b1001_1101_1000_1100),
-                0b1101_0111_1010_0011_1000_0100_1010_0000
+                encode_bitfiddle(0b1111_0001_0010_0000, 0b1001_1101_1000_1100, 0),
+                0b011001001011010010000011010000001000010010000000
+            );
+            println!("res bbb: {0}", encode_bitfiddle(0b1111_0001_0010_0000, 0b1001_1101_1000_1100, 0));
+            assert_eq!(
+                encode_bitfiddle(0xffff, 0, 0),
+                0b0010_0100_1001_0010_0100_1001_0010_0100_1001_0010_0100_1001
             );
         }
     }
@@ -261,17 +269,17 @@ mod tests {
 
         #[test]
         fn bittfiddle_works_for_examples() {
-            assert_eq!(decode_x_bitfiddle(12), 2);
-            assert_eq!(decode_y_bitfiddle(12), 2);
+            assert_eq!(decode_x_bitfiddle(56), 2);
+            assert_eq!(decode_y_bitfiddle(56), 2);
 
-            assert_eq!(decode_x_bitfiddle(45), 3);
-            assert_eq!(decode_y_bitfiddle(45), 6);
+            assert_eq!(decode_x_bitfiddle(2205), 3);
+            assert_eq!(decode_y_bitfiddle(2205), 6);
 
-            assert_eq!(decode_x_bitfiddle(16), 4);
-            assert_eq!(decode_y_bitfiddle(16), 0);
+            assert_eq!(decode_x_bitfiddle(64), 4);
+            assert_eq!(decode_y_bitfiddle(64), 0);
 
-            assert_eq!(decode_x_bitfiddle(0b1101_0111_1010_0011_1000_0100_1010_0000), 0b1111_0001_0010_0000);
-            assert_eq!(decode_y_bitfiddle(0b1101_0111_1010_0011_1000_0100_1010_0000), 0b1001_1101_1000_1100);
+            assert_eq!(decode_x_bitfiddle(0b011001001011010010000011010000001000010010000000), 0b1111_0001_0010_0000);
+            assert_eq!(decode_y_bitfiddle(0b011001001011010010000011010000001000010010000000), 0b1001_1101_1000_1100);
         }
     }
 

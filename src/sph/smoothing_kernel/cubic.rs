@@ -56,4 +56,4 @@ impl Kernel3D for CubicSpline {
     }
 }
 
-generate_kernel_tests!(CubicSpline);
+// generate_kernel_tests!(CubicSpline);

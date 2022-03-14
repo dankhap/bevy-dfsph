@@ -477,20 +477,29 @@ impl<TViscosityModel: ViscosityModel + std::marker::Sync> Solver3D for DFSPHSolv
 
         // ensure densities and alpha factors were initialized previously ("warmup")
         // Todo: Not happy about the way added particles are handled here. This sort of works for adding, but removing this way is impossible with this design!
+        
         if self.alpha_values.len() != fluid_world.particles.positions.len() {
+            println!("allocating buffers");
             self.alpha_values.resize(fluid_world.particles.positions.len(), 0.0 as Real);
             self.warmstart_stiffness.resize(fluid_world.particles.positions.len(), 0.0 as Real);
             self.warmstart_kappa.resize(fluid_world.particles.positions.len(), 0.0 as Real);
 
             // todo: Update only new particles.. HOW? better would be to only effectively add later
+            println!("update neighborhoods");
             fluid_world.update_neighborhood_datastructure(Vec::new(), vec![&mut self.alpha_values]);
+            println!("update densities");
+
             fluid_world.update_densities(self.kernel);
+
+            println!("compute alpha factors ");
+
             Self::compute_alpha_factors(&mut self.alpha_values, fluid_world, self.kernel);
         }
 
         let mut _predicted_velocities = fluid_world.scratch_buffers.get_buffer_vector(fluid_world.particles.positions.len());
         let predicted_velocities = &mut _predicted_velocities.buffer;
 
+            println!("compute non-pressure forces");
         // compute non-pressure forces (from scratch)
         {
             let mut accellerations = fluid_world.scratch_buffers.get_buffer_vector(fluid_world.particles.positions.len());
@@ -510,6 +519,7 @@ impl<TViscosityModel: ViscosityModel + std::marker::Sync> Solver3D for DFSPHSolv
                     .zip((&particles.positions, &particles.velocities).into_par_iter())
                     .enumerate()
                     .for_each(|(i, (a, (&ri, &vi)))| {
+                        println!("for each accellerations");
                         // forces
                         *a = non_pressure_accelleration;
 

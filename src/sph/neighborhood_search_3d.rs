@@ -208,7 +208,7 @@ impl CompactMortonCellGrid {
                 num_misses += 1;
 
                 // Try next. Prefer to just grind the array, but at some point use bigmin to jump ahead.
-                if num_misses > MAX_CONSECUTIVE_CELL_MISSES {
+                /* if num_misses > MAX_CONSECUTIVE_CELL_MISSES {
                     let expected_next_cidx = super::morton_3d::find_bigmin(cell.cidx, cidx_min, cidx_max);
                     cell_arrayidx += Self::find_next_cell(&self.cells[cell_arrayidx..], expected_next_cidx);
                     if expected_next_cidx <= cell.cidx {
@@ -216,19 +216,21 @@ impl CompactMortonCellGrid {
                         println!("number of misses: {0}", num_misses); */
                     }
                     assert!(expected_next_cidx > cell.cidx);
-                } else {
+                } else { */
                     cell_arrayidx += 1;
-                }
+                // }
                 cell = self.cells[cell_arrayidx];
 
                 if cell.cidx > cidx_max {
                     return runs;
                 }
             }
-            // println!("found inside index!");
+            // println!("found inside index!, checking run...");
 
             // find particle run
             runs.particle_index_runs[runs.num_runs].0 = cell.first_particle;
+
+            // println!("found run?");
             loop {
                 cell_arrayidx += 1; // we won't be here for long, no point in doing profound skipping.
                 cell = self.cells[cell_arrayidx];
@@ -253,6 +255,7 @@ impl CompactMortonCellGrid {
             cell = self.cells[cell_arrayidx];
         }
 
+            // println!("collected all runs... {0}", runs.num_runs);
         runs
     }
 
@@ -271,7 +274,7 @@ impl CompactMortonCellGrid {
 // We *know* every thread/task is writing a disjunct set of elements in this array.
 // But since size of these sets variies, it's really hard to convince the compiler of our guarantee.
 struct NeighborListRanges {
-    list: UnsafeCell<Vec<(u32, u32)>>,
+    list: UnsafeCell<Vec<(u64, u64)>>,
 }
 unsafe impl Sync for NeighborListRanges {}
 unsafe impl Send for NeighborListRanges {}
@@ -301,7 +304,7 @@ impl NeighborLists {
     ) -> Result<usize, usize> {
         microprofile::scope!("NeighborhoodSearch", "NeighborLists::try_update");
 
-        const MAX_NUM_NEIGHBORS: usize = 64; // todo: At least pretend to be scientific about this value.
+        const MAX_NUM_NEIGHBORS: usize = 64*8; // todo: At least pretend to be scientific about this value. multiplied by 8 for 3D
 
         unsafe {
             (*self.neighborhood_list_ranges.list.get()).resize(positions.len() + 1, (0, 0));
@@ -347,7 +350,7 @@ impl NeighborLists {
                 let neighborhood_list_offset = self.neighborhood_lists.extend_from_slice(&neighbor_set[..num_neighbors]).unwrap();
                 unsafe {
                     *(&mut *self.neighborhood_list_ranges.list.get()).get_unchecked_mut(i) =
-                        (neighborhood_list_offset as u32, (neighborhood_list_offset + num_neighbors) as u32);
+                        (neighborhood_list_offset as u64, (neighborhood_list_offset + num_neighbors) as u64);
                 }
             }
         });
@@ -383,20 +386,32 @@ impl NeighborLists {
     #[inline]
     pub fn foreach_neighbor(&self, particle: ParticleIndex, mut f: impl FnMut(ParticleIndex) -> ()) {
         unsafe {
+            if self.num_neighbors(particle) > 5000{
+
+                println!("got bad neighborhood_lists!0");
+            }
             let ranges = &*self.neighborhood_list_ranges.list.get();
             let range = *ranges.get_unchecked(particle as usize);
             let neighborhood_lists = self.neighborhood_lists.as_slice();
+            if self.num_neighbors(particle) > 5000{
+
+                println!("got bad neighborhood_lists!1");
+            }
             for i in range.0..range.1 {
                 f(*neighborhood_lists.get_unchecked(i as usize));
             }
         }
     }
 
-    pub fn num_neighbors(&self, particle: ParticleIndex) -> u32 {
+    pub fn num_neighbors(&self, particle: ParticleIndex) -> u64 {
         unsafe {
             let ranges = &*self.neighborhood_list_ranges.list.get();
             let range = *ranges.get_unchecked(particle as usize);
-            range.1 - range.0
+            let res = range.1 - range.0;
+            if res > 5000 {
+                println!("ranges {0} - {1}", range.1, range.0);
+            }
+            res
         }
     }
 }
@@ -486,7 +501,7 @@ impl NeighborhoodSearch {
     }
 
     #[inline]
-    pub fn num_neighbors(&self, particle: ParticleIndex) -> u32 {
+    pub fn num_neighbors(&self, particle: ParticleIndex) -> u64 {
         self.particle_particle_neighbors.num_neighbors(particle)
     }
 
@@ -496,7 +511,7 @@ impl NeighborhoodSearch {
     }
 
     #[inline]
-    pub fn num_boundary_neighbors(&self, particle: ParticleIndex) -> u32 {
+    pub fn num_boundary_neighbors(&self, particle: ParticleIndex) -> u64 {
         self.particle_boundary_neighbors.num_neighbors(particle)
     }
 

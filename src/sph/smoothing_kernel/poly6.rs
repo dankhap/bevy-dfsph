@@ -42,4 +42,4 @@ impl Kernel3D for Poly6 {
     }
 }
 
-generate_kernel_tests!(Poly6);
+// generate_kernel_tests!(Poly6);

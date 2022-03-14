@@ -8,7 +8,7 @@ mod camera;
 
 use std::sync::{Arc, Mutex};
 use bevysph::sph;
-use bevysph::units::{Point, Real, Rect3D};
+use bevysph::units::{Point, Real, Rect3D, Point3D};
 
 use rand::{prelude::SliceRandom, Rng};
 use std::{
@@ -108,7 +108,7 @@ impl MainState {
         let mut fluid_world = sph::FluidParticleWorld3D::new(
             2.0,    // smoothing factor
             1000.0, // #1660, 5000 particles/m²
-            100.0,  // density of water (? this is 2d, not 3d where it's 1000 kg/m³)
+            1000.0,  // density of water (? this is 2d, not 3d where it's 1000 kg/m³)
         );
         let xsph = sph::XSPHViscosityModel3D::new(fluid_world.properties.smoothing_length());
         //xsph.epsilon = 0.1;
@@ -254,11 +254,11 @@ fn setup(
     for z in linspace::<f32>(-0.1, 0.1, 8) {
 
         for (p,vel) in simState.fluid_world.particles.positions.iter().zip(simState.fluid_world.particles.velocities.iter()) {
-            let velocity = Vec3::new(vel[0], vel[1], 0.0);
+            let velocity = Vec3::new(vel[0], vel[1], vel[2]);
             // let pos = Point::new((p.x * CAMERA_SCALE) - 500.0, p.y * CAMERA_SCALE - 300.0);
-            let pos = Point::new(p.x , p.y );
-            println!("position of particales: {}, {}",pos.x, pos.y);
-            let transform = Transform::from_xyz(pos.x, pos.y, z);
+            let pos = Point3D::new(p.x , p.y, p.z );
+            // println!("position of particales: {}, {}, {}",pos.x, pos.y, pos.z);
+            let transform = Transform::from_xyz(pos.x, pos.y, pos.z);
             commands
                 .spawn()
                 .insert_bundle((
@@ -295,70 +295,14 @@ fn setup(
     commands.insert_resource(simState);
 }
 
-/// Applies gravity to all entities with velocity
-fn velocity_system(time: Res<Time>, mut q: Query<&mut Velocity>) {
-    let delta = time.delta_seconds();
-
-    for mut v in q.iter_mut() {
-        v.translation += Vec3::new(0.0, GRAVITY * delta, 0.0);
-    }
-}
-
-/// Checks for collisions of contributor-birds.
-///
-/// On collision with left-or-right wall it resets the horizontal
-/// velocity. On collision with the ground it applies an upwards
-/// force.
-fn collision_system(
-    wins: Res<Windows>,
-    mut q: Query<(&mut Velocity, &mut Transform), With<MainState>>,
-) {
-    let mut rnd = rand::thread_rng();
-
-    let win = wins.get_primary().unwrap();
-
-    let ceiling = win.height() / 2.;
-    let ground = -(win.height() / 2.);
-
-    let wall_left = -(win.width() / 2.);
-    let wall_right = win.width() / 2.;
-
-    for (mut v, mut t) in q.iter_mut() {
-        let left = t.translation.x - SPRITE_SIZE / 2.0;
-        let right = t.translation.x + SPRITE_SIZE / 2.0;
-        let top = t.translation.y + SPRITE_SIZE / 2.0;
-        let bottom = t.translation.y - SPRITE_SIZE / 2.0;
-
-        // clamp the translation to not go out of the bounds
-        if bottom < ground {
-            t.translation.y = ground + SPRITE_SIZE / 2.0;
-            // apply an impulse upwards
-            v.translation.y = rnd.gen_range(700.0..1000.0);
-        }
-        if top > ceiling {
-            t.translation.y = ceiling - SPRITE_SIZE / 2.0;
-        }
-        // on side walls flip the horizontal velocity
-        if left < wall_left {
-            t.translation.x = wall_left + SPRITE_SIZE / 2.0;
-            v.translation.x *= -1.0;
-            v.rotation *= -1.0;
-        }
-        if right > wall_right {
-            t.translation.x = wall_right - SPRITE_SIZE / 2.0;
-            v.translation.x *= -1.0;
-            v.rotation *= -1.0;
-        }
-    }
-}
-
 /// Apply velocity to positions and rotations.
 fn move_system(time: Res<Time>, mut simState: ResMut<MainState>, mut q: Query<(&Velocity, &mut Transform)>) {
     let delta = time.delta_seconds();
+    println!("steping...");
     simState.single_sim_step();
     
     let total_real_particles = simState.fluid_world.particles.positions.len();
-    for (i, z) in linspace::<f32>(-0.1, 0.1, 8).enumerate() {
+    /* for (i, z) in linspace::<f32>(-0.1, 0.1, 8).enumerate() {
         for (j, (v, mut t)) in q.iter_mut()
             .enumerate()
             .filter(|(l,k)| l >= &(i*total_real_particles) && l < &((i+1) * total_real_particles)) {
@@ -367,7 +311,9 @@ fn move_system(time: Res<Time>, mut simState: ResMut<MainState>, mut q: Query<(&
              let transform = Vec3::new(p.x, p.y, z);
              t.translation = transform;
         }
-    }
+    } */
+
+    // }
 }
 
 

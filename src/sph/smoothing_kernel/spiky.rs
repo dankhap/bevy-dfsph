@@ -42,4 +42,4 @@ impl Kernel for Spiky {
     }
 }
 
-generate_kernel_tests!(Spiky);
+// generate_kernel_tests!(Spiky);
