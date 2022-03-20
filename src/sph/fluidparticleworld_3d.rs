@@ -44,9 +44,12 @@ impl Particles {
     // Can be useful to determine particle deficiency. Not used right now.
     #[inline]
     pub(super) fn num_total_neighbors(&self, pidx: ParticleIndex) -> u64 {
-        self.neighborhood.num_neighbors(pidx) + self.neighborhood.num_boundary_neighbors(pidx)
-    }
-}
+        let mut res = self.neighborhood.num_neighbors(pidx);
+        if self.boundary_particles.len() > 0 {
+            res += self.neighborhood.num_boundary_neighbors(pidx);
+        }
+        res
+}}
 
 pub struct ConstantFluidProperties {
     smoothing_length: Real, // typically expressed as 'h'
@@ -227,7 +230,7 @@ impl FluidParticleWorld3D {
         let neighborhood = &self.particles.neighborhood;
         let positions = &self.particles.positions;
         let boundary_positions = &self.particles.boundary_particles;
-        println!("boundary_positions: {0}", boundary_positions.len());
+        //println!("boundary_positions: {0}", boundary_positions.len());
         self.particles
             .densities
             .par_iter_mut()
@@ -246,23 +249,23 @@ impl FluidParticleWorld3D {
                         *density += density_contribution;
                     },
                 );
-                Particles::foreach_neighbor_particle_internal_boundary_new(
+                /* Particles::foreach_neighbor_particle_internal_boundary_new(
                     &neighborhood,
                     i,
                     #[inline(always)]
                     |j| {
-                        println!("processing boundary neighborhood {0}", j);
+                        //println!("processing boundary neighborhood {0}", j);
                         let r_sq = ri.distance2(unsafe { *boundary_positions.get_unchecked(j as usize) });
                         let density_contribution = kernel.evaluate(r_sq, r_sq.sqrt()) * mass;
                         *density += density_contribution;
                     },
-                );
+                ); */
 
                 // Pressure clamping to work around particle deficiency problem. Good explanation here:
                 // https://github.com/InteractiveComputerGraphics/SPlisHSPlasH/issues/36#issuecomment-495883932
                 *density = density.max(fluid_density);
             });
-        println!("finish up density");
+        //println!("finish up density");
     }
 
     // sorts particle attributes internally!

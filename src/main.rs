@@ -251,32 +251,30 @@ fn setup(
     println!("nbumber of particales: {}",simState.get_particle_num());
     println!("radius of particales: {}",particle_radius);
     
-    for z in linspace::<f32>(-0.1, 0.1, 8) {
 
-        for (p,vel) in simState.fluid_world.particles.positions.iter().zip(simState.fluid_world.particles.velocities.iter()) {
-            let velocity = Vec3::new(vel[0], vel[1], vel[2]);
-            // let pos = Point::new((p.x * CAMERA_SCALE) - 500.0, p.y * CAMERA_SCALE - 300.0);
-            let pos = Point3D::new(p.x , p.y, p.z );
-            // println!("position of particales: {}, {}, {}",pos.x, pos.y, pos.z);
-            let transform = Transform::from_xyz(pos.x, pos.y, pos.z);
-            commands
-                .spawn()
-                .insert_bundle((
-                    Velocity {
-                        translation: velocity,
-                        rotation: 0.0
-                    },
-                ))
-                .insert_bundle(PbrBundle {
-                    mesh: meshes.add(Mesh::from(shape::Icosphere {radius: 0.01, subdivisions: 1})),
-                    material: materials.add(Color::BLUE.into()),
-                    transform: transform,
-                    ..Default::default()
-                })
-                .id();
-        }
-
+    for (p,vel) in simState.fluid_world.particles.positions.iter().zip(simState.fluid_world.particles.velocities.iter()) {
+        let velocity = Vec3::new(vel[0], vel[1], vel[2]);
+        // let pos = Point::new((p.x * CAMERA_SCALE) - 500.0, p.y * CAMERA_SCALE - 300.0);
+        let pos = Point3D::new(p.x , p.y, p.z );
+        // println!("position of particales: {}, {}, {}",pos.x, pos.y, pos.z);
+        let transform = Transform::from_xyz(pos.x, pos.y, pos.z);
+        commands
+            .spawn()
+            .insert_bundle((
+                Velocity {
+                    translation: velocity,
+                    rotation: 0.0
+                },
+            ))
+            .insert_bundle(PbrBundle {
+                mesh: meshes.add(Mesh::from(shape::Icosphere {radius: 0.01, subdivisions: 1})),
+                material: materials.add(Color::BLUE.into()),
+                transform: transform,
+                ..Default::default()
+            })
+            .id();
     }
+
     /* for p in &simState.fluid_world.particles.boundary_particles {
 
         // let pos = Point::new((p.x * CAMERA_SCALE) - 500.0, p.y * CAMERA_SCALE -300.0);
@@ -298,10 +296,17 @@ fn setup(
 /// Apply velocity to positions and rotations.
 fn move_system(time: Res<Time>, mut simState: ResMut<MainState>, mut q: Query<(&Velocity, &mut Transform)>) {
     let delta = time.delta_seconds();
-    println!("steping...");
     simState.single_sim_step();
     
     let total_real_particles = simState.fluid_world.particles.positions.len();
+    
+    for (j, (v, mut t)) in q.iter_mut()
+        .enumerate(){
+         let p = &simState.fluid_world.particles.positions[j];
+         
+         let transform = Vec3::new(p.x, p.y, p.z);
+         t.translation = transform;
+    }
     /* for (i, z) in linspace::<f32>(-0.1, 0.1, 8).enumerate() {
         for (j, (v, mut t)) in q.iter_mut()
             .enumerate()

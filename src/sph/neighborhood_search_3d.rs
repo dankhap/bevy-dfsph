@@ -212,8 +212,8 @@ impl CompactMortonCellGrid {
                     let expected_next_cidx = super::morton_3d::find_bigmin(cell.cidx, cidx_min, cidx_max);
                     cell_arrayidx += Self::find_next_cell(&self.cells[cell_arrayidx..], expected_next_cidx);
                     if expected_next_cidx <= cell.cidx {
-                        /* println!("unexpected cell calculated! expected: {0}, cell.cidx: {1}", expected_next_cidx, cell.cidx);
-                        println!("number of misses: {0}", num_misses); */
+                        /* //println!("unexpected cell calculated! expected: {0}, cell.cidx: {1}", expected_next_cidx, cell.cidx);
+                        //println!("number of misses: {0}", num_misses); */
                     }
                     assert!(expected_next_cidx > cell.cidx);
                 } else { */
@@ -225,12 +225,12 @@ impl CompactMortonCellGrid {
                     return runs;
                 }
             }
-            // println!("found inside index!, checking run...");
+            // 
 
             // find particle run
             runs.particle_index_runs[runs.num_runs].0 = cell.first_particle;
 
-            // println!("found run?");
+            // 
             loop {
                 cell_arrayidx += 1; // we won't be here for long, no point in doing profound skipping.
                 cell = self.cells[cell_arrayidx];
@@ -255,7 +255,7 @@ impl CompactMortonCellGrid {
             cell = self.cells[cell_arrayidx];
         }
 
-            // println!("collected all runs... {0}", runs.num_runs);
+            // //println!("collected all runs... {0}", runs.num_runs);
         runs
     }
 
@@ -338,7 +338,7 @@ impl NeighborLists {
                             neighbor_set[num_neighbors] = j as u64;
                             num_neighbors += 1;
                             if num_neighbors == MAX_NUM_NEIGHBORS {
-                                println!("particle has too many neighbors");
+                                
                                 break 'neighbor_search;
                             }
                         }
@@ -388,14 +388,14 @@ impl NeighborLists {
         unsafe {
             if self.num_neighbors(particle) > 5000{
 
-                println!("got bad neighborhood_lists!0");
+                
             }
             let ranges = &*self.neighborhood_list_ranges.list.get();
             let range = *ranges.get_unchecked(particle as usize);
             let neighborhood_lists = self.neighborhood_lists.as_slice();
             if self.num_neighbors(particle) > 5000{
 
-                println!("got bad neighborhood_lists!1");
+                
             }
             for i in range.0..range.1 {
                 f(*neighborhood_lists.get_unchecked(i as usize));
@@ -408,9 +408,9 @@ impl NeighborLists {
             let ranges = &*self.neighborhood_list_ranges.list.get();
             let range = *ranges.get_unchecked(particle as usize);
             let res = range.1 - range.0;
-            if res > 5000 {
-                println!("ranges {0} - {1}", range.1, range.0);
-            }
+            /* if res > 5000 {
+                //println!("ranges {0} - {1}", range.1, range.0);
+            } */
             res
         }
     }

@@ -87,7 +87,7 @@ impl<TViscosityModel: ViscosityModel + std::marker::Sync> DFSPHSolver3D<TViscosi
                         gradient_square_sum += grad_ij.magnitude2();
                     },
                 );
-                particles.foreach_neighbor_particle_boundary(
+                /* particles.foreach_neighbor_particle_boundary(
                     i,
                     #[inline(always)]
                     |j| {
@@ -96,7 +96,7 @@ impl<TViscosityModel: ViscosityModel + std::marker::Sync> DFSPHSolver3D<TViscosi
                         gradient_sum += grad_ij;
                         gradient_square_sum += grad_ij.magnitude2();
                     },
-                );
+                ); */
 
                 *alpha_value = 1.0 / (gradient_sum.magnitude2() + gradient_square_sum).max(EPSILON);
                 // todo?
@@ -124,6 +124,7 @@ impl<TViscosityModel: ViscosityModel + std::marker::Sync> DFSPHSolver3D<TViscosi
                         delta += delta_v.dot(self.kernel.gradient_from_positions(pos_i, pos_j));
                     },
                 );
+                if particles.boundary_particles.len() > 0 {
                 particles.foreach_neighbor_particle_boundary(
                     i,
                     #[inline(always)]
@@ -137,7 +138,7 @@ impl<TViscosityModel: ViscosityModel + std::marker::Sync> DFSPHSolver3D<TViscosi
 
                 // ignore loss of density
                 *density_error_i = reference_density.max(*density_error_i) - reference_density;
-            });
+            }});
     }
 
     fn correct_velocity_with_density_error(&mut self, dt: Real, fluid_world: &FluidParticleWorld3D, velocities: &mut [Vector3D], density_error: &[Real]) {
@@ -171,6 +172,7 @@ impl<TViscosityModel: ViscosityModel + std::marker::Sync> DFSPHSolver3D<TViscosi
                         delta += (ki + kj) * kernel.gradient_from_positions(ri, pos_j);
                     },
                 );
+                if particles.boundary_particles.len() > 0 {
                 particles.foreach_neighbor_particle_boundary(
                     i,
                     #[inline(always)]
@@ -182,7 +184,7 @@ impl<TViscosityModel: ViscosityModel + std::marker::Sync> DFSPHSolver3D<TViscosi
                 );
 
                 *predicted_velocity -= inv_dt * delta * particle_mass;
-            });
+            }});
     }
 
     fn correct_density_error_warmstart(&self, dt: Real, fluid_world: &FluidParticleWorld3D, velocities: &mut [Vector3D]) {
@@ -213,6 +215,7 @@ impl<TViscosityModel: ViscosityModel + std::marker::Sync> DFSPHSolver3D<TViscosi
                         delta += (ki + kj) * kernel.gradient_from_positions(ri, pos_j);
                     },
                 );
+                if particles.boundary_particles.len() > 0 {
                 particles.foreach_neighbor_particle_boundary(
                     i,
                     #[inline(always)]
@@ -223,7 +226,7 @@ impl<TViscosityModel: ViscosityModel + std::marker::Sync> DFSPHSolver3D<TViscosi
                 );
 
                 *predicted_velocity -= inv_dt * delta * particle_mass;
-            });
+            }});
     }
 
     fn correct_density_error(&mut self, dt: Real, fluid_world: &mut FluidParticleWorld3D, velocities: &mut [Vector3D]) {
@@ -235,21 +238,28 @@ impl<TViscosityModel: ViscosityModel + std::marker::Sync> DFSPHSolver3D<TViscosi
             for k in &mut self.warmstart_kappa {
                 *k = 0.5 * k.max(-0.5 * fluid_world.properties.fluid_density() * fluid_world.properties.fluid_density());
             }
+            
             self.correct_density_error_warmstart(dt, fluid_world, velocities);
+            
         }
         for k in &mut self.warmstart_kappa {
             *k = 0.0;
         }
 
+            
         let mut _density_error = fluid_world.scratch_buffers.get_buffer_real(fluid_world.particles.positions.len());
         let density_error = &mut _density_error.buffer;
 
+            
         self.num_density_correction_iterations = 0;
         loop {
             microprofile::scope!("DFSPHSolver3D", "density_iteration");
 
+            
             self.compute_density_error(dt, fluid_world, velocities, density_error);
+            
             self.correct_velocity_with_density_error(dt, fluid_world, velocities, density_error);
+            
             self.num_density_correction_iterations += 1;
 
             let avg_density_error: Real = density_error.par_iter().sum::<Real>() / density_error.len() as Real;
@@ -258,7 +268,7 @@ impl<TViscosityModel: ViscosityModel + std::marker::Sync> DFSPHSolver3D<TViscosi
 
             // error is expressed relative to fluid density and time!
             if relative_density_error * dt < self.max_avg_density_error {
-                // println!(
+                // 
                 //     "Density error correction finished after {} steps. Density error was {}, that is {}% relative error per second. Target was {}% per second",
                 //     self.num_density_correction_iterations,
                 //     avg_density_error,
@@ -307,6 +317,9 @@ impl<TViscosityModel: ViscosityModel + std::marker::Sync> DFSPHSolver3D<TViscosi
                         delta += delta_v.dot(self.kernel.gradient_from_positions(ri, pos_j));
                     },
                 );
+                
+                if particles.boundary_particles.len() > 0 {
+                    
                 particles.foreach_neighbor_particle_boundary(
                     i,
                     #[inline(always)]
@@ -316,9 +329,11 @@ impl<TViscosityModel: ViscosityModel + std::marker::Sync> DFSPHSolver3D<TViscosi
                         delta += delta_v.dot(self.kernel.gradient_from_positions(ri, pos_j));
                     },
                 );
+
+                
                 *density_change_i = delta * particle_mass;
                 *density_change_i = density_change_i.max(0.0); // clamp density loss
-            });
+            }});
     }
 
     fn correct_velocity_with_divergence_error(&mut self, fluid_world: &FluidParticleWorld3D, velocities: &mut [Vector3D], density_change: &[Real]) {
@@ -351,6 +366,7 @@ impl<TViscosityModel: ViscosityModel + std::marker::Sync> DFSPHSolver3D<TViscosi
                         delta += (ki + kj) * kernel.gradient_from_positions(ri, pos_j);
                     },
                 );
+                if particles.boundary_particles.len() > 0 {
                 particles.foreach_neighbor_particle_boundary(
                     i,
                     #[inline(always)]
@@ -361,7 +377,7 @@ impl<TViscosityModel: ViscosityModel + std::marker::Sync> DFSPHSolver3D<TViscosi
                 );
 
                 *predicted_velocity -= delta * particle_mass;
-            });
+            }});
     }
 
     fn correct_divergence_error_warmstart(&self, fluid_world: &FluidParticleWorld3D, velocities: &mut [Vector3D]) {
@@ -391,6 +407,7 @@ impl<TViscosityModel: ViscosityModel + std::marker::Sync> DFSPHSolver3D<TViscosi
                         delta += (ki + kj) * kernel.gradient_from_positions(ri, pos_j);
                     },
                 );
+                if particles.boundary_particles.len() > 0 {
                 particles.foreach_neighbor_particle_boundary(
                     i,
                     #[inline(always)]
@@ -399,7 +416,7 @@ impl<TViscosityModel: ViscosityModel + std::marker::Sync> DFSPHSolver3D<TViscosi
                         delta += ki * kernel.gradient_from_positions(ri, pos_j);
                     },
                 );
-
+                }
                 *predicted_velocity -= delta * particle_mass;
             });
     }
@@ -427,11 +444,15 @@ impl<TViscosityModel: ViscosityModel + std::marker::Sync> DFSPHSolver3D<TViscosi
         let density_change = &mut _density_change.buffer;
 
         self.num_divergence_correction_iterations = 0;
+        
         loop {
             microprofile::scope!("DFSPHSolver3D", "density_change_iteration");
 
+        
             self.compute_density_change(fluid_world, velocities, density_change);
+        
             self.correct_velocity_with_divergence_error(fluid_world, velocities, density_change);
+        
             self.num_divergence_correction_iterations += 1;
 
             let avg_divergence: Real =
@@ -440,7 +461,7 @@ impl<TViscosityModel: ViscosityModel + std::marker::Sync> DFSPHSolver3D<TViscosi
 
             // error is expressed relative to time
             if avg_divergence * dt < self.max_divergence_error {
-                // println!(
+                // 
                 //     "Divergence error correction finished after {} steps. Avg divergence was {}, that is {}% per second. Target was {}% per second",
                 //     self.num_divergence_correction_iterations,
                 //     avg_divergence,
@@ -479,27 +500,29 @@ impl<TViscosityModel: ViscosityModel + std::marker::Sync> Solver3D for DFSPHSolv
         // Todo: Not happy about the way added particles are handled here. This sort of works for adding, but removing this way is impossible with this design!
         
         if self.alpha_values.len() != fluid_world.particles.positions.len() {
-            println!("allocating buffers");
+            
             self.alpha_values.resize(fluid_world.particles.positions.len(), 0.0 as Real);
             self.warmstart_stiffness.resize(fluid_world.particles.positions.len(), 0.0 as Real);
             self.warmstart_kappa.resize(fluid_world.particles.positions.len(), 0.0 as Real);
 
             // todo: Update only new particles.. HOW? better would be to only effectively add later
-            println!("update neighborhoods");
+            
             fluid_world.update_neighborhood_datastructure(Vec::new(), vec![&mut self.alpha_values]);
-            println!("update densities");
+            
 
             fluid_world.update_densities(self.kernel);
 
-            println!("compute alpha factors ");
+            
 
             Self::compute_alpha_factors(&mut self.alpha_values, fluid_world, self.kernel);
+
+            
         }
 
         let mut _predicted_velocities = fluid_world.scratch_buffers.get_buffer_vector(fluid_world.particles.positions.len());
         let predicted_velocities = &mut _predicted_velocities.buffer;
 
-            println!("compute non-pressure forces");
+            
         // compute non-pressure forces (from scratch)
         {
             let mut accellerations = fluid_world.scratch_buffers.get_buffer_vector(fluid_world.particles.positions.len());
@@ -519,7 +542,7 @@ impl<TViscosityModel: ViscosityModel + std::marker::Sync> Solver3D for DFSPHSolv
                     .zip((&particles.positions, &particles.velocities).into_par_iter())
                     .enumerate()
                     .for_each(|(i, (a, (&ri, &vi)))| {
-                        println!("for each accellerations");
+                        // 
                         // forces
                         *a = non_pressure_accelleration;
 
@@ -541,7 +564,9 @@ impl<TViscosityModel: ViscosityModel + std::marker::Sync> Solver3D for DFSPHSolv
                             },
                         );
                     });
+                
             }
+            
 
             // update timestep
             {
@@ -553,6 +578,7 @@ impl<TViscosityModel: ViscosityModel + std::marker::Sync> Solver3D for DFSPHSolv
                 }
                 time_manager.update_timestep(fluid_world.properties.particle_radius() * 2.0, max_velocity_sq.sqrt());
             }
+            
 
             // predict velocity
             {
@@ -567,10 +593,12 @@ impl<TViscosityModel: ViscosityModel + std::marker::Sync> Solver3D for DFSPHSolv
             }
         }
         let dt = time_manager.timestep();
+        
 
         // density correction loop
         self.correct_density_error(dt, fluid_world, predicted_velocities);
 
+        
         // advect particles
         {
             microprofile::scope!("DFSPHSolver3D", "advect");
@@ -585,6 +613,7 @@ impl<TViscosityModel: ViscosityModel + std::marker::Sync> Solver3D for DFSPHSolv
                 });
             time_manager.update_time();
         }
+        
         // only attribute other than position that we need going forward is predicted velocities!
         fluid_world.update_neighborhood_datastructure(vec![predicted_velocities], Vec::new());
 
@@ -596,8 +625,9 @@ impl<TViscosityModel: ViscosityModel + std::marker::Sync> Solver3D for DFSPHSolv
 
         // divergence error loop
         self.correct_divergence_error(dt, fluid_world, predicted_velocities);
-
+        
         // update velocities
         std::mem::swap(&mut fluid_world.particles.velocities, predicted_velocities);
+        
     }
 }
