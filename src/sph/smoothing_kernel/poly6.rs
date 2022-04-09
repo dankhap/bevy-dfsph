@@ -17,8 +17,10 @@ impl Poly6 {
         Poly6 {
             hsq: smoothing_length * smoothing_length,
             // 2D normalization factor from Salva https://github.com/rustsim/salva/blob/master/src/kernel/poly6_kernel.rs#L14
-            normalizer: 4.0 / (std::f64::consts::PI as Real * smoothing_length.powi(8)),
-            normalizer_grad: 24.0 / (std::f64::consts::PI as Real * smoothing_length.powi(8)),
+            /* normalizer: 4.0 / (std::f64::consts::PI as Real * smoothing_length.powi(8)),
+            normalizer_grad: 24.0 / (std::f64::consts::PI as Real * smoothing_length.powi(8)), */
+            normalizer: (315.0 / 64.0) / (std::f64::consts::PI as Real * smoothing_length.powi(9)),
+            normalizer_grad: 6.0 * (315.0 / 64.0) / (std::f64::consts::PI as Real * smoothing_length.powi(9)),
         }
     }
 }

@@ -107,7 +107,7 @@ impl MainState {
 
         let mut fluid_world = sph::FluidParticleWorld3D::new(
             2.0,    // smoothing factor
-            1000.0, // #1660, 5000 particles/m²
+            5000.0, // #1660, 5000 particles/m²
             1000.0,  // density of water (? this is 2d, not 3d where it's 1000 kg/m³)
         );
         let xsph = sph::XSPHViscosityModel3D::new(fluid_world.properties.smoothing_length());
@@ -169,11 +169,13 @@ impl MainState {
 
         fluid_world.add_fluid_rect(&Rect3D::new(0.1, 0.7, -0.1, 0.5, 1.0, 0.2), 0.05);
 
+        fluid_world.add_boundary_thick_plane(Point3D::new(0.0, 0.0, -0.1), Point3D::new(1.75, -0.1, 0.1), 2);
+        // fluid_world.add_boundary_thick_line(Point3D::new(0.0, 0.6, 0.0), Point3D::new(1.75, 0.5, 0.0), 2);
+        
         /* fluid_world.add_boundary_thick_plane(Point3D::new(0.0, 0.0, -0.1), Point3D::new(2.0, 0.0, 0.1), 2);
         fluid_world.add_boundary_thick_plane(Point3D::new(0.0, 0.0, -0.1), Point3D::new(0.0, 2.5, 0.1), 2);
         fluid_world.add_boundary_thick_plane(Point3D::new(2.0, 0.0, -0.1), Point3D::new(2.0, 2.5, 0.1), 2);
 
-        fluid_world.add_boundary_plane(Point3D::new(0.0, 0.6, -0.1), Point3D::new(1.75, 0.5, 0.1));
  */
         // close of the container - stop gap solution for issues with endlessly falling particles
         // (mostly a problem for adaptive timestep but potentially also for neighborhood search)
@@ -275,21 +277,21 @@ fn setup(
             .id();
     }
 
-    /* for p in &simState.fluid_world.particles.boundary_particles {
+    for p in &simState.fluid_world.particles.boundary_particles {
 
         // let pos = Point::new((p.x * CAMERA_SCALE) - 500.0, p.y * CAMERA_SCALE -300.0);
-        let pos = Point::new(p.x , p.y );
-        let transform = Transform::from_xyz(pos.x, pos.y, 0.0);
+        let pos = Point3D::new(p.x , p.y, p.z );
+        let transform = Transform::from_xyz(pos.x, pos.y, pos.z);
         commands
             .spawn_bundle(PbrBundle {
                 mesh: meshes.add(Mesh::from(shape::Icosphere {radius: 0.01, subdivisions: 1})),
-                material: materials.add(Color::GRAY.into()),
+                material: materials.add(Color::BLACK.into()),
                 transform: transform,
                 ..Default::default()
             })
             .id();
     }
- */
+
     commands.insert_resource(simState);
 }
 

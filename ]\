@@ -9,7 +9,7 @@ use crate::units::*;
 pub type ParticleIndex = u64;
 pub type MortonCellIndex = u64;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Copy, Clone)]
 struct MortonCellPos {
     x: u16,
     y: u16,
@@ -102,16 +102,7 @@ impl CompactMortonCellGrid {
         // ... just a bit harder to parallize this way.
         for (i, &pos) in positions.iter().enumerate() {
             let cidx = grid.position_to_cidx(pos);
-            // println!("updating pos {:#?}", pos);
-            /* if cidx == 0{
-                println!("got cidx 0 in neighborhood_search_3d::106, i={}", i);
-                println!("pos: {:#?}", pos);
-            } */
-            /* if cidx == 40210710958665{
-                println!("got bad x pos in update, i={}", i);
-                println!("pos: {:#?}", pos);
-            }
- */
+
             particle_indices.buffer[i] = i as ParticleIndex;
             cell_indices.buffer[i] = cidx;
 
@@ -153,10 +144,6 @@ impl CompactMortonCellGrid {
         let mut prev_cidx = MortonCellIndex::max_value();
         for (pidx, &cidx) in cell_indices.buffer.iter().enumerate() {
             if cidx != prev_cidx {
-            /* if cidx == 0{
-                println!("got cidx 0 in neighborhood_search_3d::151");
-                continue;
-            } */
                 self.cells.push(MortonCell { first_particle: pidx, cidx });
                 prev_cidx = cidx;
             }
@@ -192,7 +179,7 @@ impl CompactMortonCellGrid {
 
     fn get_particle_runs_in_neighborbox(&self, cidx: MortonCellIndex) -> MortonCellNeihborhoodRuns {
         let pos = MortonCellPos::from_cidx(cidx);
-        // println!("geting particles in {:?}, for {}", pos, cidx);
+        println!("geting particles in {:?}", pos);
         let cidx_min = MortonCellPos { x: pos.x - 1, y: pos.y - 1, z: pos.z - 1 }.to_cidx();
         let cidx_max = MortonCellPos { x: pos.x + 1, y: pos.y + 1, z: pos.z + 1 }.to_cidx();
 
@@ -275,7 +262,6 @@ impl CompactMortonCellGrid {
 
     // todo: remove, impl already no longer optimal
     pub fn foreach_potential_neighbor(&self, grid: &GridProperties, position: Point3D, mut f: impl FnMut(usize) -> ()) {
-        println!("getting particle runs in 265");
         let runs = self.get_particle_runs_in_neighborbox(grid.position_to_cidx(position));
         for range in runs.particle_index_runs.iter() {
             for j in range.0..range.1 {
@@ -336,11 +322,6 @@ impl NeighborLists {
             let mut neighbor_set = [0; MAX_NUM_NEIGHBORS];
 
             // set of all potential neighbors
-            /* if current_cell.cidx == 0{
-                println!("got cidx 0!");
-                println!("next cidx: {}", next_cell.cidx );
-                
-            } */
             let particle_runs = neighbor_cell_grid.get_particle_runs_in_neighborbox(current_cell.cidx);
 
             // for each particle in this cell...
@@ -478,7 +459,6 @@ impl NeighborhoodSearch {
     // todo: allow boundaries to have properties
     pub fn update_boundary(&mut self, scratch_buffers: &mut ScratchBufferStore, positions: &mut Vec<Point3D>) {
         microprofile::scope!("NeighborhoodSearch", "update_boundary");
-        println!("boundary update");
         self.cellgrid_boundary.update(scratch_buffers, &self.grid, positions, &mut [], &mut []);
     }
 
@@ -491,7 +471,6 @@ impl NeighborhoodSearch {
         boundary_positions: &[Point3D],
     ) {
         microprofile::scope!("NeighborhoodSearch", "update_particle_neighbors");
-        println!("update cellgrid_particles");
         self.cellgrid_particles.update(
             scratch_buffers,
             &self.grid,
@@ -499,7 +478,6 @@ impl NeighborhoodSearch {
             particle_attributes_vector,
             particle_attributes_real,
         );
-        println!("update particle_particle");
         self.particle_particle_neighbors.update(
             &self.grid,
             particle_positions,
@@ -507,8 +485,8 @@ impl NeighborhoodSearch {
             particle_positions,
             &self.cellgrid_particles,
         );
+        println!("updated particle neighbours...");
         if !boundary_positions.is_empty() {
-        println!("updatding boundary neighbours...");
             self.particle_boundary_neighbors.update(
                 &self.grid,
                 particle_positions,
@@ -517,6 +495,7 @@ impl NeighborhoodSearch {
                 &self.cellgrid_boundary,
             );
 
+            println!("updated boundary particle neighbours...");
         }
     }
 

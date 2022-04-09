@@ -16,8 +16,10 @@ impl CubicSpline {
     pub fn new(smoothing_length: Real) -> CubicSpline {
         CubicSpline {
             h_inv: 1.0 / smoothing_length,
-            normalizer: 6.0 * 40.0 / (7.0 * std::f64::consts::PI as Real * smoothing_length * smoothing_length),
-            normalizer_grad: 6.0 * 40.0 / (7.0 * std::f64::consts::PI as Real * smoothing_length * smoothing_length * smoothing_length),
+            /* normalizer: 6.0 * 40.0 / (7.0 * std::f64::consts::PI as Real * smoothing_length * smoothing_length),
+            normalizer_grad: 6.0 * 40.0 / (7.0 * std::f64::consts::PI as Real * smoothing_length * smoothing_length * smoothing_length), */
+            normalizer: 6.0 * 8.0 / ( std::f64::consts::PI as Real * smoothing_length * smoothing_length * smoothing_length ),
+            normalizer_grad: 6.0 * 8.0 / (std::f64::consts::PI as Real * smoothing_length * smoothing_length * smoothing_length * smoothing_length),
         }
     }
 }

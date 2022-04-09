@@ -8,6 +8,8 @@ use super::neighborhood_search_3d::{NeighborhoodSearch, ParticleIndex};
 use super::scratch_buffer_3d::ScratchBufferStore;
 use super::smoothing_kernel::Kernel3D;
 
+use itertools::linspace;
+
 pub struct Particles {
     pub positions: Vec<Point3D>,
     pub velocities: Vec<Vector3D>,
@@ -176,21 +178,29 @@ impl FluidParticleWorld3D {
             }
             
         }
+        // println!("fluid particle pos: {:#?}", self.particles.positions);
     }
-
 
     pub fn add_boundary_thick_plane(&mut self, start: Point3D, end: Point3D, thickness_in_particles: u32) {
         let dir = (end - start).normalize();
-        let dir_perpendicular = Vector3D::new(-dir.y, dir.x, dir.z);
+        let dir_perpendicular = Vector3D::new(-dir.y, dir.x, 0.0);
+        let plane_depth = dir.z;
+        let thickness_plane = plane_depth * self.properties.num_particles_per_meter();
         let thickness_world = thickness_in_particles as Real / self.properties.num_particles_per_meter();
         let elongation = dir * thickness_world;
         let mut offset = -dir_perpendicular * thickness_world;
         let step = dir_perpendicular * thickness_world / thickness_in_particles as Real;
-        for _ in 0..thickness_in_particles {
-            self.add_boundary_line(start + offset, end + offset + elongation);
-            offset += step;
+        for (i, z) in linspace::<Real>(start.z, end.z, thickness_plane.ceil() as usize).enumerate() {
+            for _ in 0..thickness_in_particles {
+                let s = Point3D::new(start.x, start.y, z);
+                let e = Point3D::new(end.x, end.y, z);
+                self.add_boundary_line(s + offset, e + offset + elongation);
+                offset += step;
+            }
         }
+        // println!("boundary particle pos: {:#?}", self.particles.boundary_particles);
     }
+
 
     pub fn add_boundary_thick_line(&mut self, start: Point3D, end: Point3D, thickness_in_particles: u32) {
         let dir = (end - start).normalize();
@@ -249,23 +259,21 @@ impl FluidParticleWorld3D {
                         *density += density_contribution;
                     },
                 );
-                /* Particles::foreach_neighbor_particle_internal_boundary_new(
+                Particles::foreach_neighbor_particle_internal_boundary_new(
                     &neighborhood,
                     i,
                     #[inline(always)]
                     |j| {
-                        //println!("processing boundary neighborhood {0}", j);
                         let r_sq = ri.distance2(unsafe { *boundary_positions.get_unchecked(j as usize) });
                         let density_contribution = kernel.evaluate(r_sq, r_sq.sqrt()) * mass;
                         *density += density_contribution;
                     },
-                ); */
+                );
 
                 // Pressure clamping to work around particle deficiency problem. Good explanation here:
                 // https://github.com/InteractiveComputerGraphics/SPlisHSPlasH/issues/36#issuecomment-495883932
                 *density = density.max(fluid_density);
             });
-        //println!("finish up density");
     }
 
     // sorts particle attributes internally!
@@ -283,11 +291,14 @@ impl FluidParticleWorld3D {
         let mut additional_particle_attributes_real = additional_particle_attributes_real;
 
         if self.boundary_changed {
+            println!("boundary_changed!!");
             self.particles
                 .neighborhood
                 .update_boundary(&mut self.scratch_buffers, &mut self.particles.boundary_particles);
             self.boundary_changed = false;
         }
+
+           println!("update_ndst...") ;
 
         self.particles.neighborhood.update_particle_neighbors(
             &mut self.scratch_buffers,

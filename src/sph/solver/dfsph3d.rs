@@ -302,7 +302,7 @@ impl<TViscosityModel: ViscosityModel + std::marker::Sync> DFSPHSolver3D<TViscosi
                 let i = i as u64;
 
                 // particle deficiency?
-                if particles.num_total_neighbors(i) < 9 {
+                if particles.num_total_neighbors(i) < 20 {
                     *density_change_i = 0.0;
                     return;
                 }
@@ -522,7 +522,6 @@ impl<TViscosityModel: ViscosityModel + std::marker::Sync> Solver3D for DFSPHSolv
         let mut _predicted_velocities = fluid_world.scratch_buffers.get_buffer_vector(fluid_world.particles.positions.len());
         let predicted_velocities = &mut _predicted_velocities.buffer;
 
-            
         // compute non-pressure forces (from scratch)
         {
             let mut accellerations = fluid_world.scratch_buffers.get_buffer_vector(fluid_world.particles.positions.len());
@@ -564,7 +563,6 @@ impl<TViscosityModel: ViscosityModel + std::marker::Sync> Solver3D for DFSPHSolv
                             },
                         );
                     });
-                
             }
             
 
@@ -589,16 +587,20 @@ impl<TViscosityModel: ViscosityModel + std::marker::Sync> Solver3D for DFSPHSolv
                     .zip(fluid_world.particles.velocities.iter().zip(accellerations.buffer.iter()))
                 {
                     *predicted_velocity = v + a * dt;
+                    if predicted_velocity.x > 10.0{
+                       
+                    }
+                       // println!("v: {:#?}, v': {:#?}", predicted_velocity, a*dt);
                 }
             }
         }
         let dt = time_manager.timestep();
         
 
-        // density correction loop
-        self.correct_density_error(dt, fluid_world, predicted_velocities);
 
-        
+        // density correction loop
+        // self.correct_density_error(dt, fluid_world, predicted_velocities);
+
         // advect particles
         {
             microprofile::scope!("DFSPHSolver3D", "advect");
@@ -610,13 +612,17 @@ impl<TViscosityModel: ViscosityModel + std::marker::Sync> Solver3D for DFSPHSolv
                 .zip(predicted_velocities.par_iter())
                 .for_each(|(position, predicted_velocity)| {
                     *position += predicted_velocity * dt;
+                    
+                   // println!("p: {:#?}, v': {:#?}", position, predicted_velocity*dt);
                 });
             time_manager.update_time();
         }
         
+            println!("computing alphas 6");
         // only attribute other than position that we need going forward is predicted velocities!
         fluid_world.update_neighborhood_datastructure(vec![predicted_velocities], Vec::new());
 
+            println!("computing alphas 7");
         // todo: fuse density & alpha factor computation?
         // recompute densities
         fluid_world.update_densities(self.kernel);
