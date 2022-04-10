@@ -153,10 +153,6 @@ impl CompactMortonCellGrid {
         let mut prev_cidx = MortonCellIndex::max_value();
         for (pidx, &cidx) in cell_indices.buffer.iter().enumerate() {
             if cidx != prev_cidx {
-            /* if cidx == 0{
-                println!("got cidx 0 in neighborhood_search_3d::151");
-                continue;
-            } */
                 self.cells.push(MortonCell { first_particle: pidx, cidx });
                 prev_cidx = cidx;
             }
@@ -336,11 +332,6 @@ impl NeighborLists {
             let mut neighbor_set = [0; MAX_NUM_NEIGHBORS];
 
             // set of all potential neighbors
-            /* if current_cell.cidx == 0{
-                println!("got cidx 0!");
-                println!("next cidx: {}", next_cell.cidx );
-                
-            } */
             let particle_runs = neighbor_cell_grid.get_particle_runs_in_neighborbox(current_cell.cidx);
 
             // for each particle in this cell...

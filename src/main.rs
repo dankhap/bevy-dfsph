@@ -107,7 +107,7 @@ impl MainState {
 
         let mut fluid_world = sph::FluidParticleWorld3D::new(
             2.0,    // smoothing factor
-            5000.0, // #1660, 5000 particles/m²
+            2000.0, // #1660, 5000 particles/m²
             1000.0,  // density of water (? this is 2d, not 3d where it's 1000 kg/m³)
         );
         let xsph = sph::XSPHViscosityModel3D::new(fluid_world.properties.smoothing_length());
@@ -167,19 +167,14 @@ impl MainState {
         fluid_world.remove_all_fluid_particles();
         fluid_world.remove_all_boundary_particles();
 
-        fluid_world.add_fluid_rect(&Rect3D::new(0.1, 0.7, -0.1, 0.5, 1.0, 0.2), 0.05);
+        fluid_world.add_fluid_rect(&Rect3D::new(0.3, 0.5, -0.1, 0.5, 0.8, 0.2), 0.05);
 
-        fluid_world.add_boundary_thick_plane(Point3D::new(0.0, 0.0, -0.1), Point3D::new(1.75, -0.1, 0.1), 2);
-        // fluid_world.add_boundary_thick_line(Point3D::new(0.0, 0.6, 0.0), Point3D::new(1.75, 0.5, 0.0), 2);
-        
-        /* fluid_world.add_boundary_thick_plane(Point3D::new(0.0, 0.0, -0.1), Point3D::new(2.0, 0.0, 0.1), 2);
-        fluid_world.add_boundary_thick_plane(Point3D::new(0.0, 0.0, -0.1), Point3D::new(0.0, 2.5, 0.1), 2);
-        fluid_world.add_boundary_thick_plane(Point3D::new(2.0, 0.0, -0.1), Point3D::new(2.0, 2.5, 0.1), 2);
+        fluid_world.add_boundary_rect(&Rect3D::new(0.1, -0.2, -0.5, 1.0, 0.1, 1.0));
 
- */
-        // close of the container - stop gap solution for issues with endlessly falling particles
-        // (mostly a problem for adaptive timestep but potentially also for neighborhood search)
-        // fluid_world.add_boundary_thick_plane(Point3D::new(0.0, 2.5, -0.1), Point::new(2.0, 2.5, 0.1), 2);
+        fluid_world.add_boundary_rect(&Rect3D::new(0.1, -0.2, -0.5, 1.0, 0.5, 0.1));
+        fluid_world.add_boundary_rect(&Rect3D::new(0.1, -0.2, -0.5, 0.1, 0.5, 1.0));
+        /* fluid_world.add_boundary_rect(&Rect3D::new(1.1, 0.0, -0.5, 0.1, 0.5, 1.0));
+        fluid_world.add_boundary_rect(&Rect3D::new(0.1, 0.0,  0.5, 1.0, 0.5, 0.1)); */
     }
 
     fn single_sim_step(&mut self) {
@@ -285,7 +280,7 @@ fn setup(
         commands
             .spawn_bundle(PbrBundle {
                 mesh: meshes.add(Mesh::from(shape::Icosphere {radius: 0.01, subdivisions: 1})),
-                material: materials.add(Color::BLACK.into()),
+                material: materials.add(Color::WHITE.into()),
                 transform: transform,
                 ..Default::default()
             })
@@ -295,30 +290,39 @@ fn setup(
     commands.insert_resource(simState);
 }
 
+fn clamp(v: f32, min: f32, max: f32) -> f32 {
+    if v < min {
+        min
+    } else if v > max {
+        max
+    } else {
+        v
+    }
+}
+fn heatmap_color(t: f32) -> Color {
+    Color::Rgba {
+        red: clamp(t * 3.0, 0.0, 1.0),
+        green: clamp(t * 3.0 - 1.0, 0.0, 1.0),
+        blue: clamp(t * 3.0 - 2.0, 0.0, 1.0),
+        alpha: 1.0,
+    }
+}
 /// Apply velocity to positions and rotations.
-fn move_system(time: Res<Time>, mut simState: ResMut<MainState>, mut q: Query<(&Velocity, &mut Transform)>) {
+fn move_system(time: Res<Time>, mut simState: ResMut<MainState>, mut q: Query<(&Velocity, &mut Transform, &Handle<StandardMaterial>)>, mut materials: ResMut<Assets<StandardMaterial>>) {
     let delta = time.delta_seconds();
     simState.single_sim_step();
     
     let total_real_particles = simState.fluid_world.particles.positions.len();
     
-    for (j, (v, mut t)) in q.iter_mut()
+    for (j, (_, mut t, handle)) in q.iter_mut()
         .enumerate(){
          let p = &simState.fluid_world.particles.positions[j];
-         
+         let v = &simState.fluid_world.particles.velocities[j];
          let transform = Vec3::new(p.x, p.y, p.z);
          t.translation = transform;
+         /* let color = &mut materials.get_mut(handle).unwrap();
+         color.base_color = heatmap_color((v.x*v.x+v.y*v.y+v.z*v.z).sqrt()); */
     }
-    /* for (i, z) in linspace::<f32>(-0.1, 0.1, 8).enumerate() {
-        for (j, (v, mut t)) in q.iter_mut()
-            .enumerate()
-            .filter(|(l,k)| l >= &(i*total_real_particles) && l < &((i+1) * total_real_particles)) {
-             let p = &simState.fluid_world.particles.positions[j % total_real_particles];
-             
-             let transform = Vec3::new(p.x, p.y, z);
-             t.translation = transform;
-        }
-    } */
 
     // }
 }

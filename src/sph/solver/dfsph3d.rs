@@ -87,7 +87,7 @@ impl<TViscosityModel: ViscosityModel + std::marker::Sync> DFSPHSolver3D<TViscosi
                         gradient_square_sum += grad_ij.magnitude2();
                     },
                 );
-                /* particles.foreach_neighbor_particle_boundary(
+                particles.foreach_neighbor_particle_boundary(
                     i,
                     #[inline(always)]
                     |j| {
@@ -96,7 +96,7 @@ impl<TViscosityModel: ViscosityModel + std::marker::Sync> DFSPHSolver3D<TViscosi
                         gradient_sum += grad_ij;
                         gradient_square_sum += grad_ij.magnitude2();
                     },
-                ); */
+                );
 
                 *alpha_value = 1.0 / (gradient_sum.magnitude2() + gradient_square_sum).max(EPSILON);
                 // todo?
@@ -598,7 +598,7 @@ impl<TViscosityModel: ViscosityModel + std::marker::Sync> Solver3D for DFSPHSolv
         
 
 
-        // density correction loop
+        // density correction loop skipped TODO...
         // self.correct_density_error(dt, fluid_world, predicted_velocities);
 
         // advect particles
@@ -618,11 +618,9 @@ impl<TViscosityModel: ViscosityModel + std::marker::Sync> Solver3D for DFSPHSolv
             time_manager.update_time();
         }
         
-            println!("computing alphas 6");
         // only attribute other than position that we need going forward is predicted velocities!
         fluid_world.update_neighborhood_datastructure(vec![predicted_velocities], Vec::new());
 
-            println!("computing alphas 7");
         // todo: fuse density & alpha factor computation?
         // recompute densities
         fluid_world.update_densities(self.kernel);

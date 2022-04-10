@@ -86,12 +86,14 @@ impl ConstantFluidProperties {
     }
 
     fn num_particles_per_meter(&self) -> Real {
-        self.particle_density.sqrt()
+        // self.particle_density.sqrt()
+        self.particle_density.cbrt()
     }
 
     fn particle_radius_from_particle_density(particle_density: Real) -> Real {
         // density is per m²
-        0.5 / particle_density.sqrt()
+        // 0.5 / particle_density.sqrt()
+        0.5 / particle_density.cbrt()
     }
 
     pub fn particle_radius(&self) -> Real {
@@ -179,6 +181,35 @@ impl FluidParticleWorld3D {
             
         }
         // println!("fluid particle pos: {:#?}", self.particles.positions);
+    }
+
+    pub fn add_boundary_rect(&mut self, fluid_rect: &Rect3D) {
+        let jitter_amount = 0.0;
+        // fluid_rect.w * fluid_rect.h / self.particle_density, but discretized per axis
+        let num_particles_per_meter = self.properties.num_particles_per_meter()*1.0;
+        let num_particles_x = std::cmp::max(1, (fluid_rect.w as Real * num_particles_per_meter) as usize);
+        let num_particles_y = std::cmp::max(1, (fluid_rect.h as Real * num_particles_per_meter) as usize);
+        let num_particles_z = std::cmp::max(1, (fluid_rect.d as Real * num_particles_per_meter) as usize);
+        let num_particles = num_particles_x * num_particles_y * num_particles_z;
+
+        let mut rng: SmallRng = SeedableRng::seed_from_u64(self.particles.positions.len() as u64);
+
+        let bottom_left = Point3D::new(fluid_rect.x as Real, fluid_rect.y as Real, fluid_rect.z as Real);
+        let step = (fluid_rect.w as Real / (num_particles_x as Real)).min(fluid_rect.h as Real / (num_particles_y as Real));
+        let jitter_factor = step * jitter_amount;
+        for y in 0..num_particles_y {
+            for x in 0..num_particles_x {
+                for z in 0..num_particles_z {
+                    let jitter = (rng.gen::<Vector3D>() * 0.5 + Vector3D::new(0.5, 0.5, 0.5)) * jitter_factor;
+                    let pos = bottom_left + jitter + Vector3D::new(step * (x as Real), step * (y as Real), step * (z as Real));
+                    self.particles.boundary_particles.push(pos);
+                    
+                }
+                
+            }
+            
+        }
+        self.boundary_changed = true;
     }
 
     pub fn add_boundary_thick_plane(&mut self, start: Point3D, end: Point3D, thickness_in_particles: u32) {
