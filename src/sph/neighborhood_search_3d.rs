@@ -482,7 +482,6 @@ impl NeighborhoodSearch {
         boundary_positions: &[Point3D],
     ) {
         microprofile::scope!("NeighborhoodSearch", "update_particle_neighbors");
-        println!("update cellgrid_particles");
         self.cellgrid_particles.update(
             scratch_buffers,
             &self.grid,
@@ -490,7 +489,6 @@ impl NeighborhoodSearch {
             particle_attributes_vector,
             particle_attributes_real,
         );
-        println!("update particle_particle");
         self.particle_particle_neighbors.update(
             &self.grid,
             particle_positions,
@@ -499,7 +497,6 @@ impl NeighborhoodSearch {
             &self.cellgrid_particles,
         );
         if !boundary_positions.is_empty() {
-        println!("updatding boundary neighbours...");
             self.particle_boundary_neighbors.update(
                 &self.grid,
                 particle_positions,

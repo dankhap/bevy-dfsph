@@ -148,6 +148,27 @@ impl FluidParticleWorld3D {
         self.particles.velocities.clear();
     }
 
+    pub fn cube_fluid(&mut self, pos: Vector3D, ni: usize, nj: usize, nk: usize, particle_rad: f32 ) {
+        let half_extents = Vector3D::new(ni as f32, nj as f32, nk as f32) * particle_rad;
+
+        let num_particles = ni * nj * nk;
+        let new_total_particle_count = self.particles.positions.len() + num_particles;
+        self.particles.positions.reserve(new_total_particle_count);
+        self.particles.velocities.resize(new_total_particle_count, Zero::zero());
+        self.particles.densities.resize(new_total_particle_count, Zero::zero());
+
+        for i in 0..ni {
+            for j in 0..nj {
+                for k in 0..nk {
+                    let x = (i as f32) * particle_rad * 2.0;
+                    let y = (j as f32) * particle_rad * 2.0;
+                    let z = (k as f32) * particle_rad * 2.0;
+                    self.particles.positions.push( Point3D::new(x, y, z) + Vector3D::new(particle_rad, particle_rad, particle_rad) - half_extents + pos);
+                }
+            }
+        }
+    }
+
     /// - `jitter`: Amount of jitter. 0 for perfect lattice. >1 and particles are no longer in a strict lattice.
     pub fn add_fluid_rect(&mut self, fluid_rect: &Rect3D, jitter_amount: Real) {
         // fluid_rect.w * fluid_rect.h / self.particle_density, but discretized per axis
@@ -155,6 +176,8 @@ impl FluidParticleWorld3D {
         let num_particles_x = std::cmp::max(1, (fluid_rect.w as Real * num_particles_per_meter) as usize);
         let num_particles_y = std::cmp::max(1, (fluid_rect.h as Real * num_particles_per_meter) as usize);
         let num_particles_z = std::cmp::max(1, (fluid_rect.d as Real * num_particles_per_meter) as usize);
+        println!("fluid rect: px:{0}, py:{1}, pz:{2}", num_particles_x, num_particles_y, num_particles_z);
+        println!("smoothing_factor: {0}", self.properties.smoothing_length);
         let num_particles = num_particles_x * num_particles_y * num_particles_z;
 
         let new_total_particle_count = self.particles.positions.len() + num_particles;
@@ -328,8 +351,6 @@ impl FluidParticleWorld3D {
                 .update_boundary(&mut self.scratch_buffers, &mut self.particles.boundary_particles);
             self.boundary_changed = false;
         }
-
-           println!("update_ndst...") ;
 
         self.particles.neighborhood.update_particle_neighbors(
             &mut self.scratch_buffers,

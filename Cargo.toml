@@ -17,6 +17,7 @@ cgmath = { git = "https://github.com/rustgd/cgmath", features=["mint", "rand"] }
 rayon = "1.5"
 microprofile = { git = "https://github.com/jonasmr/microprofile-rust.git", rev="37f5844" } #, features = ["disabled"] }
 itertools = "0.4.6"
+isosurface = "0.1.0-alpha.0"
 
 [dev-dependencies]
 more-asserts = "0.2.1"

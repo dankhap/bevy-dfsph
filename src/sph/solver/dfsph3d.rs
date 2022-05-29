@@ -257,7 +257,6 @@ impl<TViscosityModel: ViscosityModel + std::marker::Sync> DFSPHSolver3D<TViscosi
 
             
             self.compute_density_error(dt, fluid_world, velocities, density_error);
-            
             self.correct_velocity_with_density_error(dt, fluid_world, velocities, density_error);
             
             self.num_density_correction_iterations += 1;
@@ -265,16 +264,24 @@ impl<TViscosityModel: ViscosityModel + std::marker::Sync> DFSPHSolver3D<TViscosi
             let avg_density_error: Real = density_error.par_iter().sum::<Real>() / density_error.len() as Real;
             let relative_density_error = avg_density_error / fluid_world.properties.fluid_density();
             assert!(avg_density_error.is_finite());
-
+            let mut max_v = 0.0;
+            for predicted_velocity in velocities.iter_mut()
+            {
+                if predicted_velocity.x > max_v {
+                    max_v = predicted_velocity.x;                   
+                }
+            }
+            println!("correction iter:{0}, avg_error: {1}, relative error: {2}, max_vel: {3}, dt: {4}", 
+                     self.num_density_correction_iterations, avg_density_error, relative_density_error, max_v, dt);
             // error is expressed relative to fluid density and time!
             if relative_density_error * dt < self.max_avg_density_error {
-                // 
-                //     "Density error correction finished after {} steps. Density error was {}, that is {}% relative error per second. Target was {}% per second",
-                //     self.num_density_correction_iterations,
-                //     avg_density_error,
-                //     relative_density_error * dt * 100.0,
-                //     self.max_avg_density_error * 100.0,
-                // );
+                /* println!(
+                    "Density error correction finished after {} steps. Density error was {}, that is {}% relative error per second. Target was {}% per second",
+                    self.num_density_correction_iterations,
+                    avg_density_error,
+                    relative_density_error * dt * 100.0,
+                    self.max_avg_density_error * 100.0,
+                ); */
                 break;
             }
             if self.num_density_correction_iterations > self.max_num_density_correction_iterations {
@@ -599,7 +606,7 @@ impl<TViscosityModel: ViscosityModel + std::marker::Sync> Solver3D for DFSPHSolv
 
 
         // density correction loop skipped TODO...
-        // self.correct_density_error(dt, fluid_world, predicted_velocities);
+        self.correct_density_error(dt, fluid_world, predicted_velocities);
 
         // advect particles
         {

@@ -1,23 +1,25 @@
 use bevy::prelude::*;
 use bevy::diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin};
-// use bevy_prototype_lyon::prelude::*;
-// use cgmath::prelude::*;
-use std::collections::VecDeque;
-use std::time::{Duration, Instant};
 mod camera;
 
-use std::sync::{Arc, Mutex};
-use bevysph::sph;
 use bevysph::units::{Point, Real, Rect3D, Point3D};
-
-use rand::{prelude::SliceRandom, Rng};
+use bevysph::main_state;
 use std::{
     collections::BTreeSet,
 };
 use bevy::render::camera::{Camera, CameraProjection, DepthCalculation, VisibleEntities};
-
-
 use itertools::linspace;
+
+use isosurface::{
+    distance::Signed,
+    extractor::IndexedInterleavedNormals,
+    feature::ParticleBasedMinimisation,
+    implicit::{Cylinder, Difference, Intersection, RectangularPrism, Sphere, Torus, Union},
+    // math::Vec3,
+    sampler::Sampler,
+    source::CentralDifference,
+    DualContouring, ExtendedMarchingCubes, LinearHashedMarchingCubes, MarchingCubes,
+};
 
 struct SimpleOrthoProjection {
     far: f32,
@@ -51,170 +53,11 @@ impl Default for SimpleOrthoProjection {
     }
 }
 
-const SIMULATION_STEP_HISTORY_LENGTH: usize = 80;
 
-const TARGET_FPS: Real = 60.0;
-// Simulation time will try to stay sync with real time unless framerate drops below this. If it simulates slower, simulation time slows down.
-// Note that this measure avoid the "well of despair" (as dubbed by https://docs.nvidia.com/gameworks/content/gameworkslibrary/physx/guide/Manual/BestPractices.html)
-// where we need to do more physics step to catch up, but by doing so take even longer to catch up.
-const TARGET_FPS_MIN: Real = 10.0;
-const TARGET_MAX_PROCESSING_TIME: Real = 1.0 / TARGET_FPS_MIN;
-
-// Desired relationship between time in reality and time in simulation. In other word, "speed factor"
-// (that is, if we simulation processing time is low enough, otherwise simulation will slow down regardless)
-const REALTIME_TO_SIMTIME_SCALE: f32 = 1.0;
-
-const TARGET_FRAME_SIMDURATION: Real = REALTIME_TO_SIMTIME_SCALE / TARGET_FPS;
-
-struct Particle;
 struct Velocity {
     translation: Vec3,
     rotation: f32,
 }
-struct ParticlePool {
-    particle_grid: Vec3,
-}
-struct Position(Vec3);
-struct Name(String);
-struct GreetTimer(Timer);
-type Particles = BTreeSet<String>;
-struct SelectTimer;
-struct ContributorDisplay;
-struct ContributorSelection {
-    order: Vec<(String, Entity)>,
-    idx: usize,
-}
-
-struct MainState {
-    fluid_world: sph::FluidParticleWorld3D,
-    time_manager: sph::TimeManager,
-    sph_solver: Arc<Mutex<dyn sph::Solver3D + Send>>,
-
-    simulation_step_duration_history: VecDeque<Duration>,
-    simulation_processing_time_frame: Duration,
-    simulationstep_count_frame: u32,
-
-    simulation_starttime: Instant,
-    simulation_processing_time_total: Duration,
-    simulation_to_realtime_offset: f32, // Starts out with 0 and grows if we spend too much time on processing the simulation
-
-    frame_counter: usize,
-
-}
-
-impl MainState {
-    pub fn new() -> MainState {
-
-        let mut fluid_world = sph::FluidParticleWorld3D::new(
-            2.0,    // smoothing factor
-            2000.0, // #1660, 5000 particles/m²
-            1000.0,  // density of water (? this is 2d, not 3d where it's 1000 kg/m³)
-        );
-        let xsph = sph::XSPHViscosityModel3D::new(fluid_world.properties.smoothing_length());
-        //xsph.epsilon = 0.1;
-        /* let mut physicalviscosity = 
-            sph::PhysicalViscosityModel::new(fluid_world.properties.smoothing_length());
-        physicalviscosity.fluid_viscosity = 0.01; */
-
-        let sph_solver: Arc<Mutex<dyn sph::Solver3D + Send> > = 
-            Arc::new(Mutex::new(sph::DFSPHSolver3D::new(xsph, fluid_world.properties.smoothing_length())));
-
-
-        // let main_state = MainState::new)
-        let mut simulator = 0;
-        Self::reset_fluid(&mut fluid_world);
-
-        let cfl_factor = 1.0;
-        let time_manager = sph::TimeManager::new(
-            //sph::TimeManagerConfiguration::FixedTimeStep(TARGET_FRAME_SIMDURATION / 20.0));
-            sph::TimeManagerConfiguration::AdaptiveTimeStep {
-                timestep_max: TARGET_FRAME_SIMDURATION / 4.0,
-                timestep_min: REALTIME_TO_SIMTIME_SCALE / (400.0 * 60.0), // Don't do steps that results in more than a 400 steps for an image on a classic 60Hz display
-                timestep_target_frame: sph::AdaptiveTimeStepTarget::None,
-                cfl_factor,
-            },
-        );
-
-        MainState {
-            // update_mode: UpdateMode::RealTime,
-            fluid_world,
-            time_manager,
-            sph_solver,
-
-            // camera: Camera::center_around_world_rect(graphics::screen_coordinates(ctx), Rect::new(-0.1, -0.1, 2.1, 1.6)),
-
-            simulation_step_duration_history: VecDeque::with_capacity(SIMULATION_STEP_HISTORY_LENGTH),
-            simulation_processing_time_frame: Default::default(),
-            simulationstep_count_frame: 0,
-
-            simulation_starttime: Instant::now(),
-            simulation_processing_time_total: Default::default(),
-            simulation_to_realtime_offset: Default::default(),
-
-            frame_counter: 0,
-        }
-    }
-    fn get_particale_radius(&self) -> f32 {
-        let particle_radius = self.fluid_world.properties.particle_radius()*CAMERA_SCALE;
-        return particle_radius;
-    }
-
-    fn get_particle_num(&self) -> usize {
-        return self.fluid_world.particles.positions.len();
-    }
-
-    fn reset_fluid(fluid_world: &mut sph::FluidParticleWorld3D) {
-        fluid_world.remove_all_fluid_particles();
-        fluid_world.remove_all_boundary_particles();
-
-        fluid_world.add_fluid_rect(&Rect3D::new(0.3, 0.5, -0.1, 0.5, 0.8, 0.2), 0.05);
-
-        fluid_world.add_boundary_rect(&Rect3D::new(0.1, -0.2, -0.5, 1.0, 0.1, 1.0));
-
-        fluid_world.add_boundary_rect(&Rect3D::new(0.1, -0.2, -0.5, 1.0, 0.5, 0.1));
-        fluid_world.add_boundary_rect(&Rect3D::new(0.1, -0.2, -0.5, 0.1, 0.5, 1.0));
-        /* fluid_world.add_boundary_rect(&Rect3D::new(1.1, 0.0, -0.5, 0.1, 0.5, 1.0));
-        fluid_world.add_boundary_rect(&Rect3D::new(0.1, 0.0,  0.5, 1.0, 0.5, 0.1)); */
-    }
-
-    fn single_sim_step(&mut self) {
-        let time_before = Instant::now();
-        self.sph_solver.lock().unwrap().simulation_step(&mut self.fluid_world, &mut self.time_manager);
-        let time_after = Instant::now();
-
-        let step_processing_time = time_after - time_before;
-        self.simulation_processing_time_frame += step_processing_time;
-        self.simulation_processing_time_total += step_processing_time;
-        self.simulationstep_count_frame += 1;
-
-        if self.simulation_step_duration_history.len() == SIMULATION_STEP_HISTORY_LENGTH {
-            self.simulation_step_duration_history.pop_front();
-        }
-        self.simulation_step_duration_history.push_back(step_processing_time);
-    }
-
-    fn reset_simulation(&mut self) {
-        self.sph_solver.lock().unwrap().clear_cached_data(); // todo: this is super meh
-        self.simulation_starttime = Instant::now();
-        self.simulation_to_realtime_offset = 0.0;
-        self.simulation_processing_time_total = Default::default();
-
-        self.frame_counter = 0;
-        self.time_manager.restart();
-        Self::reset_fluid(&mut self.fluid_world);
-    }
-}
-const GRAVITY: f32 = -9.821 * 100.0;
-const SPRITE_SIZE: f32 = 3.0;
-
-const SATURATION_DESELECTED: f32 = 0.3;
-const LIGHTNESS_DESELECTED: f32 = 0.2;
-const SATURATION_SELECTED: f32 = 0.9;
-const LIGHTNESS_SELECTED: f32 = 0.7;
-const ALPHA: f32 = 0.92;
-
-const SHOWCASE_TIMER_SECS: f32 = 3.0;
-const CAMERA_SCALE: f32 = 300.0;
 
 fn main() {
     App::build()
@@ -226,34 +69,42 @@ fn main() {
         .run();
 }
 
-
 fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    // mut ambient_light: ResMut<AmbientLight>
 ) {
 
     let mut camera = OrthographicCameraBundle::new_3d();
-    camera.orthographic_projection.scale = 1.0;
+    camera.orthographic_projection.scale = 2.5; //1.0;
     // camera.transform = Transform::from_xyz(5.0, 5.0, 5.0).looking_at(Vec3::ZERO, Vec3::Y);
-    camera.transform = Transform::from_xyz(5.0, 5.0, 5.0).looking_at(Vec3::ZERO, Vec3::Y);
+    camera.transform = Transform::from_xyz(0.0, 0.0, 10.0).looking_at(Vec3::ZERO, Vec3::Y);
+    // camera.transform = Transform::from_xyz(0.0, 5.0, 0.0).looking_at(Vec3::new(0.4, 0.0, 0.0), Vec3::Y);
+    // camera.transform = Transform::from_xyz(0.0, 5.0, 5.0).looking_at(Vec3::ZERO, Vec3::Y);
 
     // camera
     commands.spawn_bundle(camera);
-
     let particle_size = 0.03;
-    let simState = MainState::new();
+    let simState = main_state::MainState::new(
+        2.0,
+        1000.0,
+        1000.0);
     let particle_radius = simState.get_particale_radius(); //*CAMERA_SCALE;
-
+    let true_radius = simState.fluid_world.properties.particle_radius();
+    println!("true particle_radius: {0}", true_radius);
     println!("nbumber of particales: {}",simState.get_particle_num());
     println!("radius of particales: {}",particle_radius);
-    
+    println!("smoothing_length: {}", simState.fluid_world.properties.smoothing_length());
+    commands.spawn_bundle(LightBundle {
+        // light: Light{color: Color::BLUE, ..Default::default()},
+        transform: Transform::from_xyz(4.0, 8.0, 4.0),
+        ..Default::default()
+    }); 
 
     for (p,vel) in simState.fluid_world.particles.positions.iter().zip(simState.fluid_world.particles.velocities.iter()) {
         let velocity = Vec3::new(vel[0], vel[1], vel[2]);
-        // let pos = Point::new((p.x * CAMERA_SCALE) - 500.0, p.y * CAMERA_SCALE - 300.0);
         let pos = Point3D::new(p.x , p.y, p.z );
-        // println!("position of particales: {}, {}, {}",pos.x, pos.y, pos.z);
         let transform = Transform::from_xyz(pos.x, pos.y, pos.z);
         commands
             .spawn()
@@ -264,13 +115,33 @@ fn setup(
                 },
             ))
             .insert_bundle(PbrBundle {
-                mesh: meshes.add(Mesh::from(shape::Icosphere {radius: 0.01, subdivisions: 1})),
+                mesh: meshes.add(Mesh::from(shape::Icosphere {radius: true_radius, subdivisions: 1})),
                 material: materials.add(Color::BLUE.into()),
                 transform: transform,
                 ..Default::default()
             })
             .id();
     }
+
+    let fluid_cm = simState.get_fluid_cm();
+    let transform = Transform::from_xyz(fluid_cm.x, fluid_cm.y, fluid_cm.z);
+    /* let mesh = simState.get_mesh(0.25);
+    commands
+        .spawn()
+        .insert_bundle(PbrBundle {
+            mesh: meshes.add(mesh),
+            // material: materials.add(Color::WHITE.into()),
+            material: materials.add(StandardMaterial{
+                                        base_color: Color::Rgba{
+                                            red: 0.35, 
+                                            green: 0.35, 
+                                            blue: 0.60, 
+                                            alpha: 0.8}, 
+                                        reflectance: 0.2, ..Default::default()}),
+            transform: transform,
+            ..Default::default()
+        })
+        .id(); */
 
     for p in &simState.fluid_world.particles.boundary_particles {
 
@@ -279,7 +150,7 @@ fn setup(
         let transform = Transform::from_xyz(pos.x, pos.y, pos.z);
         commands
             .spawn_bundle(PbrBundle {
-                mesh: meshes.add(Mesh::from(shape::Icosphere {radius: 0.01, subdivisions: 1})),
+                mesh: meshes.add(Mesh::from(shape::Icosphere {radius: true_radius, subdivisions: 1})),
                 material: materials.add(Color::WHITE.into()),
                 transform: transform,
                 ..Default::default()
@@ -307,14 +178,25 @@ fn heatmap_color(t: f32) -> Color {
         alpha: 1.0,
     }
 }
+
 /// Apply velocity to positions and rotations.
-fn move_system(time: Res<Time>, mut simState: ResMut<MainState>, mut q: Query<(&Velocity, &mut Transform, &Handle<StandardMaterial>)>, mut materials: ResMut<Assets<StandardMaterial>>) {
+fn move_system(time: Res<Time>, mut simState: ResMut<main_state::MainState>,
+               mut q: Query<(&Velocity, &mut Transform, &Handle<StandardMaterial>, &Handle<Mesh>)>, 
+               mut materials: ResMut<Assets<StandardMaterial>>,
+               mut meshes: ResMut<Assets<Mesh>> ) {
     let delta = time.delta_seconds();
     simState.single_sim_step();
-    
-    let total_real_particles = simState.fluid_world.particles.positions.len();
-    
-    for (j, (_, mut t, handle)) in q.iter_mut()
+    let cm = simState.get_fluid_cm();
+    // for (j, (_, mut t, mat_handle, mesh_handle)) in q.iter_mut()
+        // .enumerate(){
+         // let transform = Vec3::new(cm.x, cm.y, cm.z);
+         // t.translation = transform;
+         /* let mesh = &mut meshes.get_mut(mesh_handle).unwrap();
+         let lbox = simState.get_fluid_bbox();
+         let newmesh = simState.get_vertices(lbox);
+         mesh.set_attribute(Mesh::ATTRIBUTE_POSITION, newmesh); */
+    // }
+    for (j, (_, mut t, mat_handle, mesh_handle)) in q.iter_mut()
         .enumerate(){
          let p = &simState.fluid_world.particles.positions[j];
          let v = &simState.fluid_world.particles.velocities[j];
