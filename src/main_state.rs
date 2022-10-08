@@ -288,7 +288,8 @@ impl MainState {
         fluid_world.remove_all_boundary_particles();
 
         // fluid_world.add_fluid_rect(&Rect3D::new(0.3, 0.0, -0.1, 0.3, 0.3, 0.3), 0.05);
-        fluid_world.cube_fluid(Vector3D::new(0.0, 0.0, 0.0), 15, 15, 15, 0.05);
+        fluid_world.cube_fluid(Vector3D::new(0.0, 1.5, 0.0), 15, 15, 15, 0.05);
+        // fluid_world.cube_fluid(Vector3D::new(0.0, 0.0, 0.0), 7, 7, 7, 0.05);
 
         fluid_world.add_boundary_rect(&Rect3D::new(-2.5, -1.2, -2.5, 5.0, 0.4, 5.0)); //bottom
         // fluid_world.add_boundary_rect(&Rect3D::new(-0.1,  1.5, -0.5, 1.0, 0.1, 1.0)); //top

@@ -38,44 +38,6 @@ impl CubicSpline {
     }
 }
 
-/* impl Kernel3D for CubicSpline {
-    #[inline]
-    fn evaluate(&self, _r_sq: Real, r: Real) -> Real {
-        let q = r * self.h_inv;
-        if q <= 0.5 {
-            let q_sq = q * q;
-            self.normalizer * ((1.0 / 6.0) + q_sq * q - q_sq)
-        } else if q <= 1.0 {
-            let one_minus_q = 1.0 - q;
-            self.normalizer * one_minus_q * one_minus_q * one_minus_q * (2.0 / 6.0)
-        } else {
-            0.0
-        }
-    }
-
-    #[inline]
-    fn gradient(&self, ri_to_rj: Vector3D, _r_sq: Real, r: Real) -> Vector3D {
-        let q = r * self.h_inv;
-        if r <= 1.0e-5 {
-            println!("too small r! {0}", r);
-        }
-        if q <= 0.5 {
-            self.normalizer_grad * q * (2.0 - q * 3.0) / r * ri_to_rj
-        } else if q < 1.0 {
-            let factor = 1.0 - q;
-            self.normalizer_grad * factor * factor / r * ri_to_rj
-        } else {
-            cgmath::Zero::zero()
-        }
-    }
-
-    #[inline]
-    fn laplacian(&self, _r_sq: Real, _r: Real) -> Real {
-        unimplemented!();
-    }
-}
- */
-/*
 impl Kernel3D for CubicSpline {
     #[inline]
     fn evaluate(&self, _r_sq: Real, r: Real) -> Real {
@@ -95,46 +57,7 @@ impl Kernel3D for CubicSpline {
     #[inline]
     fn gradient(&self, ri_to_rj: Vector3D, _r_sq: Real, r: Real) -> Vector3D {
         let q = r * self.h_inv;
-        if (r > 1.0e-5) && (q <= 1.0){
-            let gradq = ri_to_rj * (1.0 / r * self.radius);
-            if q <= 0.5 {
-                self.l* q * (2.0 - 3.0*q ) * gradq
-            } else {
-                let factor = 1.0 - q;
-                self.l * (factor * factor)* gradq
-            }
-        } else {
-            cgmath::Zero::zero()
-        }
-    }
-
-    #[inline]
-    fn laplacian(&self, _r_sq: Real, _r: Real) -> Real {
-        unimplemented!();
-    }
-}
- */
-
-impl Kernel3D for CubicSpline {
-    #[inline]
-    fn evaluate(&self, _r_sq: Real, r: Real) -> Real {
-        let q = r * self.h_inv;
-        if q <= 0.5 {
-            let q2 = q * q;
-            let q3 = q * q * q;
-            self.k * (6.0*q3 - 6.0*q2 + 1.0)
-        } else if q <= 1.0 {
-            let one_minus_q = 1.0 - q;
-            self.k * 2.0 * one_minus_q * one_minus_q * one_minus_q 
-        } else {
-            0.0
-        }
-    }
-
-    #[inline]
-    fn gradient(&self, ri_to_rj: Vector3D, _r_sq: Real, r: Real) -> Vector3D {
-        let q = r * self.h_inv;
-        if (r > 1.0e-5) && (q <= 1.0){
+        if (r > 1.0e-8) && (q <= 1.0){
             let gradq = ri_to_rj * (1.0 / r * self.radius);
             if q <= 0.5 {
                 self.l * (2.0 - 3.0 * q) *q * gradq
